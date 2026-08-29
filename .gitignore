@@ -1,0 +1,9 @@
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+*.bin
+*.hex
+*.elf
+.DS_Store
+Thumbs.db

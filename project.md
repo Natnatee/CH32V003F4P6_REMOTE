@@ -1,39 +1,47 @@
-# CH32V003F4P6 Remote Test Project
+# CH32V003F4P6 Smart Remote Project
 
 ## Overview
-โปรเจกต์ทดสอบเริ่มต้นสำหรับบอร์ดพัฒนา CH32V003F4P6 (TSSOP20) พร้อมพอร์ต Type-C USB โดยใช้เฟรมเวิร์ก `ch32v003fun` บน PlatformIO และดีบั๊กผ่าน `SDI Debug Printf` (สาย SWDIO เส้นเดียว)
-
-## Goals
-- ทดสอบการคอมไพล์และแฟลชโปรแกรมลงบอร์ด CH32V003F4P6
-- ทดสอบ Blink LED (PC1 / PD4)
-- ทดสอบการส่งข้อความผ่าน SDI Debug Printf ด้วยเครื่องมือ `minichlink -T`
-- เตรียมโครงสร้างมาตรฐานสำหรับพัฒนาฟังก์ชัน Remote / Controller ต่อไป
+โปรเจกต์พัฒนาระบบ **Smart Remote** บนไมโครคอนโทรลเลอร์ **CH32V003F4P6** (TSSOP-20) โดยย้ายโลจิกมาจากบอร์ด PY32F002A:
+1. จอแสดงผล 0.96" OLED (SSD1306) โหมดแนวตั้ง Portrait (64x128) แสดง Header `SAMSUNG` + ตัวเลข 7-Segment ขนาดใหญ่ (1-16)
+2. สวิตช์ปุ่มกด 4x4 Matrix Keypad (16 ปุ่ม) เสียบพินเรียงแถวยาวฝั่งซ้ายของบอร์ด
+3. ระบบ SDI Debug Printf ผ่านสาย SWDIO (`PD1`)
 
 ## Hardware
-- **MCU**: WCH CH32V003F4P6 (32-bit RISC-V QingKe V2A, 48MHz, 16KB Flash, 2KB SRAM)
+- **MCU**: WCH CH32V003F4P6 (32-bit RISC-V QingKe V2A @ 48MHz, 16KB Flash, 2KB SRAM)
 - **Package**: TSSOP-20
-- **Board**: CH32V003F4P6 Dev Board (Type-C USB, Onboard Reset Button, Power & Test LEDs)
-- **Programmer**: WCH-LinkE (โหมด WCH-LinkRV)
+- **Display**: 0.96" I2C OLED SSD1306 (128x64 pixels ใช้วาดแบบ Portrait 64x128)
+- **Input**: 4x4 Matrix Keypad (16 สวิตช์ปุ่มกด)
+- **Programmer**: WCH-LinkE (โหมด RISC-V)
 
 ## Pin Map
 
-### ขาเชื่อมต่อ WCH-LinkE (3 สายหลัก)
-| ขา WCH-LinkE | ขาบนบอร์ด CH32V003F4P6 | หน้าที่ | Direction | Notes |
-|---|---|---|---|---|
-| 3.3V | V (VDD) | จ่ายไฟ 3.3V | Power | ไฟเลี้ยงระบบ |
-| GND | G (GND) | กราวด์ | Power | จุดกราวด์ร่วม |
-| SWDIO / SDI | PD1 (SWIO) | สื่อสารโปรแกรมและดีบั๊ก | Bidirectional | ⚠️ ห้ามต่อโหลดพ่วง |
+### 1. Keypad 4x4 (8 พินเรียงแถวยาวฝั่งซ้ายของบอร์ด)
+| ขา Keypad | พินบน CH32V003 | โหมดการทำงาน | คำอธิบาย |
+|---|---|---|---|
+| **Pin 1 (Row 1)** | **`PD6 (RX)`** | Output Push-Pull | แถวที่ 1 (ปุ่ม S1..S4) |
+| **Pin 2 (Row 2)** | **`PA1`** | Output Push-Pull | แถวที่ 2 (ปุ่ม S5..S8) |
+| **Pin 3 (Row 3)** | **`PA2`** | Output Push-Pull | แถวที่ 3 (ปุ่ม S9..S12) |
+| **Pin 4 (Row 4)** | **`PC0`** | Output Push-Pull | แถวที่ 4 (ปุ่ม S13..S16) |
+| **Pin 5 (Col 1)** | **`PC1`** | Input Pull-Up | หลักที่ 1 |
+| **Pin 6 (Col 2)** | **`PC2`** | Input Pull-Up | หลักที่ 2 |
+| **Pin 7 (Col 3)** | **`PC3`** | Input Pull-Up | หลักที่ 3 |
+| **Pin 8 (Col 4)** | **`PC4`** | Input Pull-Up | หลักที่ 4 |
 
-### Pin Map ของบอร์ด TSSOP-20
-| Function | Pin | Device | Direction | Notes |
-|---|---|---|---|---|
-| LED / GPIO | PC1 | Onboard / Ext LED | Output | พินทดสอบไฟกระพริบ |
-| LED / GPIO | PD4 | Onboard / Ext LED | Output | พินทดสอบไฟกระพริบสำรอง |
-| SWIO / SDI | PD1 | WCH-LinkE | In/Out | ขาโปรแกรมและ SDI Printf |
-| UART1_TX | PD5 (TX) | Serial TX | Output | ขาสื่อสารซีเรียล |
-| UART1_RX | PD6 (RX) | Serial RX | Input | ขาสื่อสารซีเรียล |
-| RESET | PD7 (NRST)| Reset Button | Input | ปุ่มรีเซ็ตบนบอร์ด |
-| GPIO / AIN | PA1, PA2, PC0..PC7, PD0..PD3 | Header Pins | TBD | รอการกำหนดในเฟสถัดไป |
+### 2. จอ OLED SSD1306 (I2C)
+| ขา OLED | พินบน CH32V003 | คำอธิบาย |
+|---|---|---|
+| **SCL** | **`PC6`** | I2C Clock (Push-Pull Bit-Bang) |
+| **SDA** | **`PC7`** | I2C Data (Push-Pull Bit-Bang) |
+| **VCC** | **`V (3.3V)`** | ไฟเลี้ยงจอ 3.3V |
+| **GND** | **`G (GND)`** | กราวด์ |
+
+### 3. โปรแกรมเมอร์ WCH-LinkE
+| ขา WCH-LinkE | พินบน CH32V003 | คำอธิบาย |
+|---|---|---|
+| **3.3V** | **`V (3.3V)`** | ไฟเลี้ยงระบบ |
+| **GND** | **`G (GND)`** | กราวด์ร่วม |
+| **SWDIO** | **`PD1 (SWIO)`** | ขาแฟลชและ SDI Debug Monitor |
+
 
 ## Electrical / Safety Notes
 - แรงดันไฟฟ้าทำงาน: 3.3V หรือ 5V ผ่านพอร์ต Type-C หรือขา V (3V3)

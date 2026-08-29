@@ -1,46 +1,58 @@
 #include "ch32fun.h"
 #include <stdio.h>
+#include "ssd1306.h"
+#include "keypad.h"
+
+void SetupDebugPrintf(void);
 
 int main()
 {
-    // กำหนดค่าระบบสัญญาณนาฬิกา 48MHz
+    // 1. กำหนดค่า Core Clock 48MHz
     SystemInit();
 
-    // ⚠️ ต้องเรียกฟังก์ชันนี้เสมอเพื่อเปิดระบบ SDI Debug Printf ผ่านขา SWDIO (PD1)
+    // 2. เริ่มต้นระบบ SDI Debug Printf ผ่านขา SWDIO (PD1)
     SetupDebugPrintf();
 
-    // เปิดสัญญาณนาฬิกาให้พอร์ต GPIOC และ GPIOD
-    RCC->APB2PCENR |= RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD;
-
-    // ตั้งค่า PC1 เป็น Output Push-Pull (10MHz) สำหรับ Blink LED
-    GPIOC->CFGLR &= ~(0xf << (4 * 1));
-    GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP) << (4 * 1);
-
-    // ตั้งค่า PD4 เป็น Output Push-Pull (10MHz) สำหรับ Blink LED สำรอง
-    GPIOD->CFGLR &= ~(0xf << (4 * 4));
-    GPIOD->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP) << (4 * 4);
+    // Safety Delay
+    Delay_Ms(200);
 
     printf("\r\n=========================================\r\n");
-    printf("  CH32V003F4P6 Remote Test Project Booted!\r\n");
-    printf("  Framework: ch32v003fun | Clock: 48MHz\r\n");
-    printf("  Debug Port: SWDIO (PD1) 1-Wire Printf\r\n");
+    printf("   CH32V003F4P6 Smart Remote (4x4 Keypad)\r\n");
+    printf("   OLED I2C: PC6=SCL, PC7=SDA\r\n");
+    printf("   Keypad Rows (1..4): PD6, PA1, PA2, PC0\r\n");
+    printf("   Keypad Cols (1..4): PC1, PC2, PC3, PC4\r\n");
     printf("=========================================\r\n");
 
-    uint32_t count = 0;
-    while(1)
+    // 3. เริ่มต้นหน้าจอ OLED และ Keypad Matrix
+    ssd1306_init();
+    keypad_init();
+
+    // 4. แสดงผลหน้าจอเริ่มต้น (Header = SAMSUNG, ตัวเลขสแตนด์บาย = 0)
+    oled_render_remote_screen("SAMSUNG", 0);
+
+    uint8_t last_key = 0;
+    uint8_t row = 0, col = 0;
+
+    while (1)
     {
-        // สั่งเปิด LED (PC1 และ PD4 HIGH)
-        GPIOC->BSHR = (1 << 1);
-        GPIOD->BSHR = (1 << 4);
-        printf("[%lu] LED State: ON\r\n", count);
-        Delay_Ms(500);
+        uint8_t key = keypad_scan(&row, &col);
 
-        // สั่งปิด LED (PC1 และ PD4 LOW)
-        GPIOC->BSHR = (1 << (1 + 16));
-        GPIOD->BSHR = (1 << (4 + 16));
-        printf("[%lu] LED State: OFF\r\n", count);
-        Delay_Ms(500);
+        if (key != 0 && key != last_key)
+        {
+            last_key = key;
 
-        count++;
+            printf("[Keypad] Pressed: Button %d (Row %d, Col %d)\r\n", key, row, col);
+
+            // อัปเดตหน้าจอแนวตั้ง: SAMSUNG ด้านบน + ตัวเลขปุ่มกด (1 - 16)
+            oled_render_remote_screen("SAMSUNG", key);
+
+            Delay_Ms(150); // Debounce
+        }
+        else if (key == 0)
+        {
+            last_key = 0;
+        }
+
+        Delay_Ms(10);
     }
 }

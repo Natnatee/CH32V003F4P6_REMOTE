@@ -1,61 +1,66 @@
-# CH32V003F4P6 Remote Test Project
+# CH32V003F4P6 Smart Remote Project
 
-โปรเจกต์ทดสอบบอร์ดพัฒนา **CH32V003F4P6** (TSSOP-20) ผ่านเฟรมเวิร์ก `ch32v003fun` และดีบั๊กผ่าน `SDI Debug Printf` (สาย SWDIO เส้นเดียว)
-
-## Features
-- รองรับการคอมไพล์และอัปโหลดเฟิร์มแวร์ด้วย **PlatformIO** ร่วมกับ **`ch32v003fun`**
-- ไฟกระพริบ LED Blink Test ที่ขา `PC1` และ `PD4`
-- ระบบ Serial Debug Monitor ผ่านสาย SWDIO (ไม่ต้องต่อสาย TX/RX แยก)
+โปรเจกต์ **Smart Remote** บนบอร์ดพัฒนา **CH32V003F4P6** (TSSOP-20) ผ่านเฟรมเวิร์ก `ch32v003fun`:
+- 4x4 Matrix Keypad (16 สวิตช์ปุ่มกด) เสียบเรียง 8 พินฝั่งซ้ายของบอร์ด
+- จอ 0.96" I2C OLED SSD1306 โหมดแนวตั้ง Portrait (64x128) แสดง Header `SAMSUNG` และตัวเลข 7-Segment (1-16)
+- ระบบ Serial Debug Monitor ผ่านสาย SWDIO (`PD1`)
 
 ## Hardware
 - **MCU**: WCH CH32V003F4P6 (32-bit RISC-V QingKe V2A @ 48MHz, 16KB Flash, 2KB SRAM)
 - **Package**: TSSOP-20
-- **Dev Board**: บอร์ด CH32V003F4P6 Type-C พร้อมปุ่ม Reset และหลอด LED
+- **Display**: 0.96" SSD1306 OLED (I2C)
+- **Keypad**: 4x4 Matrix Keypad (16 Buttons)
 - **Programmer**: WCH-LinkE (โหมด RISC-V / WCH-LinkRV)
 
 ## Pin Map
 
-### 1. แผนผังพินของชิปและบอร์ด (ASCII Pinout Diagram)
+### 1. แผนผังพินของบอร์ด (ASCII Pinout Diagram)
 
 ```text
-                         CH32V003F4P6 (TSSOP-20)
-                            +-------u-------+
-                  PD4 ( 1) -| 1          20 |- (20) PD3
-             (TX) PD5 ( 2) -| 2          19 |- (19) PD2
-             (RX) PD6 ( 3) -| 3          18 |- (18) PD1 (SWIO/SDI)
-           (NRST) PD7 ( 4) -| 4          17 |- (17) PC7
-                  PA1 ( 5) -| 5          16 |- (16) PC6
-                  PA2 ( 6) -| 6          15 |- (15) PC5
-            (GND) VSS ( 7) -| 7          14 |- (14) PC4
-                  PD0 ( 8) -| 8          13 |- (13) PC3
-            (VDD) VDD ( 9) -| 9          12 |- (12) PC2
-                  PC0 (10) -| 10         11 |- (11) PC1 (LED)
-                            +---------------+
-
                CH32V003F4P6 Dev Board Pin Header Layout
                     +-----------------------+
                     |  [  USB TYPE-C  ]     |
             G (GND) | [ ]               [ ] | G (GND)
           V (3V3/5) | [ ]  [PWR] [LED]  [ ] | V (3V3/5)
-       TX (PD5/UART)| [ ]      [RST]    [ ] | PD7
-       RX (PD6/UART)| [ ]               [ ] | PD4
-                PA1 | [ ]  +---------+  [ ] | PD3
-                PA2 | [ ]  |  CH32   |  [ ] | PD2
-                PC0 | [ ]  | V003F4P6|  [ ] | PD1 (SWIO)
-          (LED) PC1 | [ ]  +---------+  [ ] | PD0
-                PC2 | [ ]               [ ] | PC7
-                PC3 | [ ]               [ ] | PC6
-                PC4 | [ ]               [ ] | PC5
+       TX (PD5/UART)| [ ]      [RST]    [ ] | PD7 (NRST - ปุ่ม Reset)
+ [K1]  RX (PD6/UART)| [ ]               [ ] | PD4
+ [K2]           PA1 | [ ]  +---------+  [ ] | PD3
+ [K3]           PA2 | [ ]  |  CH32   |  [ ] | PD2
+ [K4]           PC0 | [ ]  | V003F4P6|  [ ] | PD1 (SWIO แฟลช)
+ [K5]           PC1 | [ ]  +---------+  [ ] | PD0
+ [K6]           PC2 | [ ]               [ ] | PC7 (OLED SDA)
+ [K7]           PC3 | [ ]               [ ] | PC6 (OLED SCL)
+ [K8]           PC4 | [ ]               [ ] | PC5
                     +-----------------------+
 ```
 
-### 2. การต่อสายโปรแกรมเมอร์ WCH-LinkE (3 สายหลัก)
+### 2. ตารางการต่อสาย Keypad 4x4 (8 พินเรียงฝั่งซ้าย)
+| ขา Keypad | ขาบอร์ด CH32V003 | โหมดการทำงาน | คำอธิบาย |
+|---|---|---|---|
+| **Pin 1 (K1)** | **`RX (PD6)`** | Output | Row 1 (แถว 1: S1..S4) |
+| **Pin 2 (K2)** | **`PA1`** | Output | Row 2 (แถว 2: S5..S8) |
+| **Pin 3 (K3)** | **`PA2`** | Output | Row 3 (แถว 3: S9..S12) |
+| **Pin 4 (K4)** | **`PC0`** | Output | Row 4 (แถว 4: S13..S16) |
+| **Pin 5 (K5)** | **`PC1`** | Input Pull-Up | Col 1 (หลัก 1) |
+| **Pin 6 (K6)** | **`PC2`** | Input Pull-Up | Col 2 (หลัก 2) |
+| **Pin 7 (K7)** | **`PC3`** | Input Pull-Up | Col 3 (หลัก 3) |
+| **Pin 8 (K8)** | **`PC4`** | Input Pull-Up | Col 4 (หลัก 4) |
 
-| ขา WCH-LinkE | ขาบอร์ด CH32V003F4P6 | หน้าที่ |
-|---|---|---|
-| **3.3V** | **V (VDD)** | จ่ายแรงดันไฟเลี้ยง 3.3V |
-| **GND** | **G (GND)** | กราวด์ร่วม |
-| **SWDIO / SDI** | **PD1 (SWIO)** | สายโปรแกรมข้อมูลและ SDI Debug Printf |
+### 3. ตารางการต่อจอ OLED SSD1306 (I2C)
+| ขา OLED | ขาบอร์ด CH32V003 |
+|---|---|
+| **SCL** | **`PC6`** |
+| **SDA** | **`PC7`** |
+| **VCC** | **`V (3.3V)`** |
+| **GND** | **`G (GND)`** |
+
+### 4. การต่อสายโปรแกรมเมอร์ WCH-LinkE (3 สาย)
+| ขา WCH-LinkE | ขาบอร์ด CH32V003 |
+|---|---|
+| **3.3V** | **`V (3.3V)`** |
+| **GND** | **`G (GND)`** |
+| **SWDIO** | **`PD1 (SWIO)`** |
+
 
 ## Getting Started
 

@@ -1,7 +1,6 @@
 #include "flash_storage.h"
 #include "ir_database.h"
 #include <string.h>
-#include <stdio.h>
 
 void flash_storage_init(void) {
     // ปลดล็อก Flash สำหรับการเขียนและลบหน้า (Unlock Flash)
@@ -100,6 +99,4 @@ void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes, const
 
     // 6. ล็อก Flash
     FLASH->CTLR = CR_LOCK_Set;
-
-    printf("[Flash] Saved Profile %02d (Name: '%s') to 0x%08lX\r\n", profile_idx + 1, name_buf, page_addr);
 }

@@ -1,7 +1,6 @@
 #include "tetris.h"
 #include "ssd1306.h"
 #include <string.h>
-#include <stdio.h>
 
 #define BOARD_COLS      10
 #define BOARD_ROWS      20
@@ -30,12 +29,20 @@ static uint16_t lines_cleared = 0;
 static uint8_t game_over = 0;
 static uint8_t exit_requested = 0;
 static uint16_t drop_ticks = 0;
-static uint16_t drop_interval = 20; // 20 * 20ms = 400ms ต่อก้าว
+static uint16_t drop_interval = 20;
 
 static uint8_t hold_down_ticks = 0;
 static uint8_t hold_lr_ticks = 0;
 
 static uint32_t rng_state = 0x5A5A1234;
+
+static void u32_to_str_padded(uint32_t val, char *buf, int len) {
+    buf[len] = '\0';
+    for (int i = len - 1; i >= 0; i--) {
+        buf[i] = '0' + (val % 10);
+        val /= 10;
+    }
+}
 
 static uint8_t random_piece(void) {
     rng_state ^= rng_state << 13;
@@ -44,7 +51,6 @@ static uint8_t random_piece(void) {
     return (uint8_t)(rng_state % 7);
 }
 
-// ตรวจสอบว่ามีบล็อกที่พิกัด (bx, by) ในชิ้นส่วนที่หมุนมุม rot หรือไม่
 static uint8_t get_piece_block(uint8_t type, uint8_t rot, uint8_t bx, uint8_t by) {
     uint8_t ox = bx, oy = by;
     if (rot == 1) {
@@ -63,7 +69,6 @@ static uint8_t get_piece_block(uint8_t type, uint8_t rot, uint8_t bx, uint8_t by
     return (shape >> bit_pos) & 1;
 }
 
-// ตรวจสอบการชนขอบกระดานหรือชนบล็อกเดิม
 static uint8_t check_collision(int8_t nx, int8_t ny, uint8_t nrot) {
     for (uint8_t r = 0; r < 4; r++) {
         for (uint8_t c = 0; c < 4; c++) {
@@ -71,11 +76,9 @@ static uint8_t check_collision(int8_t nx, int8_t ny, uint8_t nrot) {
                 int8_t gx = nx + c;
                 int8_t gy = ny + r;
 
-                // ชนขอบซ้าย/ขวา หรือชนพื้นล่าง
                 if (gx < 0 || gx >= BOARD_COLS || gy >= BOARD_ROWS) {
                     return 1;
                 }
-                // ชนบล็อกที่อยู่บนกระดานแล้ว
                 if (gy >= 0 && board[gy][gx]) {
                     return 1;
                 }
@@ -85,7 +88,6 @@ static uint8_t check_collision(int8_t nx, int8_t ny, uint8_t nrot) {
     return 0;
 }
 
-// วางชิ้นบล็อกลงกระดานถาวร
 static void lock_piece(void) {
     for (uint8_t r = 0; r < 4; r++) {
         for (uint8_t c = 0; c < 4; c++) {
@@ -99,7 +101,6 @@ static void lock_piece(void) {
         }
     }
 
-    // ตรวจสอบและลบแถวที่เต็ม
     uint8_t lines_in_move = 0;
     for (int8_t r = BOARD_ROWS - 1; r >= 0; r--) {
         uint8_t full = 1;
@@ -112,17 +113,15 @@ static void lock_piece(void) {
 
         if (full) {
             lines_in_move++;
-            // ดึงแถวข้างบนลงมาทับ
             for (int8_t kr = r; kr > 0; kr--) {
                 for (uint8_t kc = 0; kc < BOARD_COLS; kc++) {
                     board[kr][kc] = board[kr - 1][kc];
                 }
             }
-            // แถวบนสุดให้เป็นว่าง
             for (uint8_t kc = 0; kc < BOARD_COLS; kc++) {
                 board[0][kc] = 0;
             }
-            r++; // ตรวจสอบแถวเดิมอีกรอบ
+            r++;
         }
     }
 
@@ -131,27 +130,24 @@ static void lock_piece(void) {
         if (lines_in_move == 1) score += 100;
         else if (lines_in_move == 2) score += 300;
         else if (lines_in_move == 3) score += 500;
-        else if (lines_in_move >= 4) score += 800; // TETRIS!
+        else if (lines_in_move >= 4) score += 800;
 
         if (score > high_score) {
             high_score = score;
         }
 
-        // เร่งความเร็วตามแถวที่ลบได้
         if (drop_interval > 6) {
             drop_interval = 20 - (lines_cleared / 5);
             if (drop_interval < 6) drop_interval = 6;
         }
     }
 
-    // สปอว์นชิ้นบล็อกถัดไป
     piece_type = next_piece;
     next_piece = random_piece();
     piece_rot = 0;
     piece_x = 3;
     piece_y = -1;
 
-    // ถ้าเกิดมาแล้วชนทันที = Game Over
     if (check_collision(piece_x, piece_y, piece_rot)) {
         game_over = 1;
         if (score > high_score) {
@@ -219,7 +215,6 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
             return;
         }
 
-        // ปุ่ม 2 หรือ 6: หมุนบล็อก (ROTATE)
         if (key == 2 || key == 6) {
             uint8_t next_rot = (piece_rot + 1) % 4;
             if (!check_collision(piece_x, piece_y, next_rot)) {
@@ -234,7 +229,6 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
             return;
         }
 
-        // ปุ่ม 12 หรือ 1: Hard Drop (ทิ้งลงพื้นทันที)
         if (key == 12 || key == 1) {
             while (!check_collision(piece_x, piece_y + 1, piece_rot)) {
                 piece_y++;
@@ -244,7 +238,6 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
             return;
         }
 
-        // ปุ่ม 5: เลื่อนซ้าย (LEFT)
         if (key == 5) {
             if (!check_collision(piece_x - 1, piece_y, piece_rot)) {
                 piece_x--;
@@ -252,7 +245,6 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
             return;
         }
 
-        // ปุ่ม 7: เลื่อนขวา (RIGHT)
         if (key == 7) {
             if (!check_collision(piece_x + 1, piece_y, piece_rot)) {
                 piece_x++;
@@ -260,7 +252,6 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
             return;
         }
 
-        // ปุ่ม 10 หรือ 14: Soft Drop (ทิ้งบล็อกลงเร็ว)
         if (key == 10 || key == 14) {
             if (!check_collision(piece_x, piece_y + 1, piece_rot)) {
                 piece_y++;
@@ -271,13 +262,11 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
             return;
         }
     } else {
-        // --- การกดแช่ (Continuous Hold) ---
         if (game_over) return;
 
-        // กดปุ่มลง 10 หรือ 14 แช่ไว้ -> ทิ้งบล็อกลงอย่างรวดเร็วต่อเนื่อง
         if (key == 10 || key == 14) {
             hold_down_ticks++;
-            if (hold_down_ticks >= 2) { // ทุก 40ms
+            if (hold_down_ticks >= 2) {
                 hold_down_ticks = 0;
                 if (!check_collision(piece_x, piece_y + 1, piece_rot)) {
                     piece_y++;
@@ -286,17 +275,15 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
                     lock_piece();
                 }
             }
-        }
-        // กดปุ่ม 5 หรือ 7 แช่ไว้ -> เลื่อนซ้าย/ขวาต่อเนื่อง
-        else if (key == 5 || key == 7) {
+        } else if (key == 5 || key == 7) {
             hold_lr_ticks++;
-            if (hold_lr_ticks >= 7) { // Initial DAS delay (~140ms)
+            if (hold_lr_ticks >= 7) {
                 if (key == 5 && !check_collision(piece_x - 1, piece_y, piece_rot)) {
                     piece_x--;
                 } else if (key == 7 && !check_collision(piece_x + 1, piece_y, piece_rot)) {
                     piece_x++;
                 }
-                hold_lr_ticks = 5; // Repeat rate (~40ms)
+                hold_lr_ticks = 5;
             }
         }
     }
@@ -305,12 +292,10 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
 void tetris_render(void) {
     oled_clear_buffer();
 
-    // 1. [ส่วนบน] Header แสดงตัวเลขคะแนนปัจจุบัน 5 หลัก
-    char score_buf[16];
-    snprintf(score_buf, sizeof(score_buf), "%05lu", score);
+    char score_buf[8];
+    u32_to_str_padded(score, score_buf, 5);
     oled_draw_str(2, 4, score_buf, 1);
 
-    // แสดงชิ้นบล็อกถัดไปตัวจิ๋ว (NEXT) มุมขวาบน (X: 46, Y: 4)
     for (uint8_t r = 0; r < 2; r++) {
         for (uint8_t c = 0; c < 4; c++) {
             if (get_piece_block(next_piece, 0, c, r)) {
@@ -318,12 +303,10 @@ void tetris_render(void) {
             }
         }
     }
-    oled_fill_rect(0, 14, 64, 1, 1); // เส้นคั่นบน
+    oled_fill_rect(0, 14, 64, 1, 1);
 
-    // 2. [ส่วนกลาง] กรอบและกระดานเกม (50x100 px)
     oled_draw_rect(BOARD_OFFSET_X - 1, BOARD_OFFSET_Y - 1, (BOARD_COLS * BLOCK_SIZE) + 2, (BOARD_ROWS * BLOCK_SIZE) + 2, 1);
 
-    // วาดบล็อกที่ติดอยู่บนกระดานแล้ว
     for (uint8_t r = 0; r < BOARD_ROWS; r++) {
         for (uint8_t c = 0; c < BOARD_COLS; c++) {
             if (board[r][c]) {
@@ -334,7 +317,6 @@ void tetris_render(void) {
         }
     }
 
-    // วาดชิ้นบล็อกที่กำลังตกลงมา
     if (!game_over) {
         for (uint8_t r = 0; r < 4; r++) {
             for (uint8_t c = 0; c < 4; c++) {
@@ -351,16 +333,15 @@ void tetris_render(void) {
         }
     }
 
-    // 3. [ส่วนล่าง] Footer แสดง High Score (HI: 00000)
     oled_fill_rect(0, 118, 64, 1, 1);
-    char hi_buf[16];
-    snprintf(hi_buf, sizeof(hi_buf), "HI:%05lu", high_score);
+    char hi_buf[10];
+    hi_buf[0] = 'H'; hi_buf[1] = 'I'; hi_buf[2] = ':';
+    u32_to_str_padded(high_score, &hi_buf[3], 5);
     oled_draw_str((64 - 8 * 6) / 2, 120, hi_buf, 1);
 
-    // ป๊อปอัป Game Over
     if (game_over) {
-        oled_fill_rect(6, 48, 52, 28, 0); // กล่องดำลบพื้นหลัง
-        oled_draw_rect(6, 48, 52, 28, 1); // กรอบขาว
+        oled_fill_rect(6, 48, 52, 28, 0);
+        oled_draw_rect(6, 48, 52, 28, 1);
         oled_draw_str(8, 53, "GAME OVER", 1);
         oled_draw_str(8, 65, "12:RETRY", 1);
     }

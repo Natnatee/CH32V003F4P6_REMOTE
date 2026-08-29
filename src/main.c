@@ -1,5 +1,4 @@
 #include "ch32fun.h"
-#include <stdio.h>
 #include <string.h>
 #include "ssd1306.h"
 #include "keypad.h"
@@ -8,32 +7,38 @@
 #include "flash_storage.h"
 #include "ir_database.h"
 #include "tetris.h"
+#include "flappy.h"
+#include "calc.h"
 
-void SetupDebugPrintf(void);
-
-// 5 โหมดการทำงาน (รวมโหมด TETRIS)
+// 7 โหมดการทำงาน (รวม TETRIS, BIRD และ CALC)
 typedef enum {
     MODE_SEND = 0,
     MODE_LEARN = 1,
     MODE_NEW = 2,
     MODE_RENAME = 3,
-    MODE_TETRIS = 4
+    MODE_TETRIS = 4,
+    MODE_BIRD = 5,
+    MODE_CALC = 6
 } RemoteMode;
 
-static const char *mode_names[5] = {
+static const char *mode_names[7] = {
     "SEND",
     "LRN ",
     "NEW ",
     "NAME",
-    "TETR"
+    "TETR",
+    "BIRD",
+    "CALC"
 };
 
-static const char *mode_select_labels[5] = {
+static const char *mode_select_labels[7] = {
     "[ SEND ]",
     "[ LEARN ]",
     "[  NEW  ]",
     "[ RENAME ]",
-    "[ TETRIS ]"
+    "[ TETRIS ]",
+    "[  BIRD  ]",
+    "[  CALC  ]"
 };
 
 // บัฟเฟอร์ใน RAM สำหรับถือเฉพาะโปรไฟล์ปัจจุบันที่กำลังใช้งาน (12 ปุ่ม = 48 ไบต์เท่านั้น!)
@@ -98,20 +103,10 @@ int main()
     // 1. กำหนดค่า Core Clock 48MHz
     SystemInit();
 
-    // 2. เริ่มต้นระบบ SDI Debug Printf ผ่านขา SWDIO (PD1)
-    SetupDebugPrintf();
-
     // Safety Delay
     Delay_Ms(200);
 
-    printf("\r\n=========================================\r\n");
-    printf("   CH32V003 Smart Remote with TETRIS\r\n");
-    printf("   IR RX Pin : PD0 (VS1838B)\r\n");
-    printf("   IR TX Pin : PD4 (38kHz PWM)\r\n");
-    printf("   Flash NVM : 16 Profiles @ 0x08003C00\r\n");
-    printf("=========================================\r\n");
-
-    // 3. เริ่มต้นฮาร์ดแวร์ OLED, Keypad, Flash Storage, IR RX & IR TX
+    // 2. เริ่มต้นฮาร์ดแวร์ OLED, Keypad, Flash Storage, IR RX & IR TX
     ssd1306_init();
     keypad_init();
     flash_storage_init();
@@ -152,7 +147,7 @@ int main()
 
     while (1)
     {
-        // --- 0. โหมดพิเศษ: TETRIS GAME ---
+        // --- 0.1 โหมดพิเศษ: TETRIS GAME ---
         if (current_mode == MODE_TETRIS && !mode_select_active)
         {
             uint8_t key = keypad_scan(&row, &col);
@@ -178,6 +173,53 @@ int main()
             continue;
         }
 
+        // --- 0.2 โหมดพิเศษ: FLAPPY BIRD GAME ---
+        if (current_mode == MODE_BIRD && !mode_select_active)
+        {
+            uint8_t key = keypad_scan(&row, &col);
+            uint8_t is_new = (key != 0 && key != last_key);
+            if (key != 0) {
+                last_key = key;
+                flappy_handle_key(key, is_new);
+            } else {
+                last_key = 0;
+            }
+
+            if (flappy_should_exit()) {
+                current_mode = MODE_SEND;
+                get_footer_str(footer_buf, current_mode, current_profile);
+                oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+            } else {
+                flappy_update();
+                flappy_render();
+            }
+
+            Delay_Ms(20);
+            continue;
+        }
+
+        // --- 0.3 โหมดพิเศษ: CALCULATOR ---
+        if (current_mode == MODE_CALC && !mode_select_active)
+        {
+            uint8_t key = keypad_scan(&row, &col);
+            if (key != 0 && key != last_key) {
+                last_key = key;
+                calc_handle_key(key);
+                calc_render();
+            } else if (key == 0) {
+                last_key = 0;
+            }
+
+            if (calc_should_exit()) {
+                current_mode = MODE_SEND;
+                get_footer_str(footer_buf, current_mode, current_profile);
+                oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+            }
+
+            Delay_Ms(20);
+            continue;
+        }
+
         // --- 1. ตรวจจับสัญญาณ IR ในโหมด LEARN ---
         if (current_mode == MODE_LEARN && !mode_select_active && !ir_captured)
         {
@@ -186,7 +228,6 @@ int main()
             {
                 captured_code = new_ir_code;
                 ir_captured = 1;
-                printf("\r\n[IR RX] >>> Received Signal: 0x%08lX <<<\r\n", captured_code);
                 oled_render_ir_captured_screen(current_profile_name, captured_code);
             }
         }
@@ -210,7 +251,6 @@ int main()
         if (key != 0 && key != last_key)
         {
             last_key = key;
-            printf("[Keypad] Pressed: Button %d (Row %d, Col %d)\r\n", key, row, col);
 
             // ==========================================
             // กรณีที่ 1: หน้าแสดงรหัส IR ที่อ่านได้ (โหมด LEARN)
@@ -221,7 +261,6 @@ int main()
                 {
                     // ปุ่ม 16: CANCEL ยกเลิก ไม่เซฟรหัส
                     ir_captured = 0;
-                    printf("[IR RX] Learn Cancelled by user\r\n");
                     get_footer_str(footer_buf, current_mode, current_profile);
                     oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                 }
@@ -234,9 +273,6 @@ int main()
                         active_codes[idx] = captured_code;
                         flash_save_profile(current_profile, active_codes, current_profile_name);
                         ir_captured = 0;
-
-                        printf("[IR RX] >> SAVED 0x%08lX to Button %d (Profile %02d: %s) <<\r\n",
-                               captured_code, key, current_profile + 1, current_profile_name);
 
                         get_footer_str(footer_buf, current_mode, current_profile);
                         oled_render_grid_screen(current_profile_name, footer_buf, key, 1, active_codes);
@@ -296,9 +332,6 @@ int main()
                         new_preview_active = 0;
                         new_preview_ticks = 0;
 
-                        printf("[NEW Mode] >> SAVED Code 0x%08lX to Button %d (Profile %02d: %s) <<\r\n",
-                               test_code, key, current_profile + 1, current_profile_name);
-
                         get_footer_str(footer_buf, current_mode, current_profile);
                         oled_render_grid_screen(current_profile_name, footer_buf, key, 1, active_codes);
                         Delay_Ms(300);
@@ -340,7 +373,6 @@ int main()
                             edit_name_buf[i] = current_profile_name[i];
                         }
                         oled_render_rename_screen(edit_name_buf, rename_cursor, 1, current_profile, 1);
-                        printf("[Rename] Editing Profile %02d Name: '%s'\r\n", current_profile + 1, edit_name_buf);
                     }
                     else if (key == 16)
                     {
@@ -382,7 +414,6 @@ int main()
 
                         flash_save_profile(current_profile, active_codes, current_profile_name);
                         rename_editing = 0;
-                        printf("[Rename] >> SAVED New Name: '%s' to Profile %02d <<\r\n", current_profile_name, current_profile + 1);
 
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     }
@@ -426,7 +457,7 @@ int main()
                 if (key == 4)
                 {
                     // ปุ่ม 4: UP
-                    selected_mode = (RemoteMode)((selected_mode + 4) % 5);
+                    selected_mode = (RemoteMode)((selected_mode + 6) % 7);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -434,7 +465,7 @@ int main()
                 else if (key == 8)
                 {
                     // ปุ่ม 8: DOWN
-                    selected_mode = (RemoteMode)((selected_mode + 1) % 5);
+                    selected_mode = (RemoteMode)((selected_mode + 1) % 7);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -451,13 +482,18 @@ int main()
                     if (current_mode == MODE_TETRIS) {
                         tetris_init();
                         tetris_render();
+                    } else if (current_mode == MODE_BIRD) {
+                        flappy_init();
+                        flappy_render();
+                    } else if (current_mode == MODE_CALC) {
+                        calc_init();
+                        calc_render();
                     } else if (current_mode == MODE_RENAME) {
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     } else {
                         get_footer_str(footer_buf, current_mode, current_profile);
                         oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                     }
-                    printf("[Mode] Switched to: %s\r\n", mode_names[current_mode]);
                 }
                 else if (key == 16)
                 {
@@ -465,6 +501,8 @@ int main()
                     mode_select_active = 0;
                     if (current_mode == MODE_RENAME) {
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
+                    } else if (current_mode == MODE_CALC) {
+                        calc_render();
                     } else {
                         get_footer_str(footer_buf, current_mode, current_profile);
                         oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
@@ -507,7 +545,6 @@ int main()
                     flash_load_profile(current_profile, active_codes, current_profile_name);
                     get_footer_str(footer_buf, current_mode, current_profile);
                     oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
-                    printf("[Profile] Loaded: %02d (%s)\r\n", current_profile + 1, current_profile_name);
                 }
                 else if (key == 8)
                 {
@@ -516,12 +553,10 @@ int main()
                     flash_load_profile(current_profile, active_codes, current_profile_name);
                     get_footer_str(footer_buf, current_mode, current_profile);
                     oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
-                    printf("[Profile] Loaded: %02d (%s)\r\n", current_profile + 1, current_profile_name);
                 }
                 else if (key == 12)
                 {
                     // ปุ่ม 12: OK
-                    printf("[Action] OK Pressed in Mode %s\r\n", mode_names[current_mode]);
                 }
                 else
                 {
@@ -534,8 +569,6 @@ int main()
                         // สั่งยิงสัญญาณ IR 38kHz ออกขา PD4 ทันทีถ้ามีโค้ด
                         if (code != 0) {
                             ir_send_code(code);
-                        } else {
-                            printf("[IR TX] Button %d is EMPTY (No Code)\r\n", key);
                         }
                     }
 

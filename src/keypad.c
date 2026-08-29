@@ -1,10 +1,10 @@
 #include "keypad.h"
 
 // Row Pins (Output Push-Pull):
-// Row 1 = PD6
-// Row 2 = PA1
-// Row 3 = PA2
-// Row 4 = PC0
+// Row 1 = PC0 (S1..S4)
+// Row 2 = PA2 (S5..S8)
+// Row 3 = PA1 (S9..S12)
+// Row 4 = PD6 (S13..S16)
 
 // Col Pins (Input Pull-up):
 // Col 1 = PC1
@@ -21,25 +21,25 @@ void keypad_init(void) {
     RCC->APB2PCENR |= (RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD);
 
     // 2. ตั้งค่า Rows เป็น Output Push-Pull (10MHz)
-    // Row 1: PD6
-    GPIOD->CFGLR &= ~(0xf << (4 * 6));
-    GPIOD->CFGLR |=  (0x1 << (4 * 6));
-    GPIOD->BSHR = (1 << 6); // default HIGH
+    // Row 1: PC0
+    GPIOC->CFGLR &= ~(0xf << (4 * 0));
+    GPIOC->CFGLR |=  (0x1 << (4 * 0));
+    GPIOC->BSHR = (1 << 0); // default HIGH
 
-    // Row 2: PA1
-    GPIOA->CFGLR &= ~(0xf << (4 * 1));
-    GPIOA->CFGLR |=  (0x1 << (4 * 1));
-    GPIOA->BSHR = (1 << 1); // default HIGH
-
-    // Row 3: PA2
+    // Row 2: PA2
     GPIOA->CFGLR &= ~(0xf << (4 * 2));
     GPIOA->CFGLR |=  (0x1 << (4 * 2));
     GPIOA->BSHR = (1 << 2); // default HIGH
 
-    // Row 4: PC0
-    GPIOC->CFGLR &= ~(0xf << (4 * 0));
-    GPIOC->CFGLR |=  (0x1 << (4 * 0));
-    GPIOC->BSHR = (1 << 0); // default HIGH
+    // Row 3: PA1
+    GPIOA->CFGLR &= ~(0xf << (4 * 1));
+    GPIOA->CFGLR |=  (0x1 << (4 * 1));
+    GPIOA->BSHR = (1 << 1); // default HIGH
+
+    // Row 4: PD6
+    GPIOD->CFGLR &= ~(0xf << (4 * 6));
+    GPIOD->CFGLR |=  (0x1 << (4 * 6));
+    GPIOD->BSHR = (1 << 6); // default HIGH
 
     // 3. ตั้งค่า Cols (PC1, PC2, PC3, PC4) เป็น Input Pull-up
     for (int pin = 1; pin <= 4; pin++) {
@@ -53,18 +53,18 @@ static inline void set_row(uint8_t r, uint8_t level) {
     if (level) {
         // High
         switch(r) {
-            case 0: GPIOD->BSHR = (1 << 6); break; // Row 1: PD6
-            case 1: GPIOA->BSHR = (1 << 1); break; // Row 2: PA1
-            case 2: GPIOA->BSHR = (1 << 2); break; // Row 3: PA2
-            case 3: GPIOC->BSHR = (1 << 0); break; // Row 4: PC0
+            case 0: GPIOC->BSHR = (1 << 0); break; // Row 1 (S1..S4): PC0
+            case 1: GPIOA->BSHR = (1 << 2); break; // Row 2 (S5..S8): PA2
+            case 2: GPIOA->BSHR = (1 << 1); break; // Row 3 (S9..S12): PA1
+            case 3: GPIOD->BSHR = (1 << 6); break; // Row 4 (S13..S16): PD6
         }
     } else {
         // Low
         switch(r) {
-            case 0: GPIOD->BCR = (1 << 6); break; // Row 1: PD6
-            case 1: GPIOA->BCR = (1 << 1); break; // Row 2: PA1
-            case 2: GPIOA->BCR = (1 << 2); break; // Row 3: PA2
-            case 3: GPIOC->BCR = (1 << 0); break; // Row 4: PC0
+            case 0: GPIOC->BCR = (1 << 0); break; // Row 1 (S1..S4): PC0
+            case 1: GPIOA->BCR = (1 << 2); break; // Row 2 (S5..S8): PA2
+            case 2: GPIOA->BCR = (1 << 1); break; // Row 3 (S9..S12): PA1
+            case 3: GPIOD->BCR = (1 << 6); break; // Row 4 (S13..S16): PD6
         }
     }
 }

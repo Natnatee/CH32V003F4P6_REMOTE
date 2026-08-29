@@ -37,10 +37,10 @@
 ### 2. ตารางการต่อสาย Keypad 4x4 (8 พินเรียงฝั่งซ้าย)
 | ขา Keypad | ขาบอร์ด CH32V003 | โหมดการทำงาน | คำอธิบาย |
 |---|---|---|---|
-| **Pin 1 (K1)** | **`RX (PD6)`** | Output | Row 1 (แถว 1: S1..S4) |
-| **Pin 2 (K2)** | **`PA1`** | Output | Row 2 (แถว 2: S5..S8) |
-| **Pin 3 (K3)** | **`PA2`** | Output | Row 3 (แถว 3: S9..S12) |
-| **Pin 4 (K4)** | **`PC0`** | Output | Row 4 (แถว 4: S13..S16) |
+| **Pin 1 (K1)** | **`PC0`** | Output | Row 1 (แถว 1: ปุ่ม S1..S4) |
+| **Pin 2 (K2)** | **`PA2`** | Output | Row 2 (แถว 2: ปุ่ม S5..S8) |
+| **Pin 3 (K3)** | **`PA1`** | Output | Row 3 (แถว 3: ปุ่ม S9..S12) |
+| **Pin 4 (K4)** | **`RX (PD6)`** | Output | Row 4 (แถว 4: ปุ่ม S13..S16) |
 | **Pin 5 (K5)** | **`PC1`** | Input Pull-Up | Col 1 (หลัก 1) |
 | **Pin 6 (K6)** | **`PC2`** | Input Pull-Up | Col 2 (หลัก 2) |
 | **Pin 7 (K7)** | **`PC3`** | Input Pull-Up | Col 3 (หลัก 3) |

@@ -18,10 +18,10 @@
 ### 1. Keypad 4x4 (8 พินเรียงแถวยาวฝั่งซ้ายของบอร์ด)
 | ขา Keypad | พินบน CH32V003 | โหมดการทำงาน | คำอธิบาย |
 |---|---|---|---|
-| **Pin 1 (Row 1)** | **`PD6 (RX)`** | Output Push-Pull | แถวที่ 1 (ปุ่ม S1..S4) |
-| **Pin 2 (Row 2)** | **`PA1`** | Output Push-Pull | แถวที่ 2 (ปุ่ม S5..S8) |
-| **Pin 3 (Row 3)** | **`PA2`** | Output Push-Pull | แถวที่ 3 (ปุ่ม S9..S12) |
-| **Pin 4 (Row 4)** | **`PC0`** | Output Push-Pull | แถวที่ 4 (ปุ่ม S13..S16) |
+| **Pin 1 (Row 1)** | **`PC0`** | Output Push-Pull | แถวที่ 1 (ปุ่ม S1..S4) |
+| **Pin 2 (Row 2)** | **`PA2`** | Output Push-Pull | แถวที่ 2 (ปุ่ม S5..S8) |
+| **Pin 3 (Row 3)** | **`PA1`** | Output Push-Pull | แถวที่ 3 (ปุ่ม S9..S12) |
+| **Pin 4 (Row 4)** | **`PD6 (RX)`** | Output Push-Pull | แถวที่ 4 (ปุ่ม S13..S16) |
 | **Pin 5 (Col 1)** | **`PC1`** | Input Pull-Up | หลักที่ 1 |
 | **Pin 6 (Col 2)** | **`PC2`** | Input Pull-Up | หลักที่ 2 |
 | **Pin 7 (Col 3)** | **`PC3`** | Input Pull-Up | หลักที่ 3 |

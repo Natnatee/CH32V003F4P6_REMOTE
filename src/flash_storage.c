@@ -11,26 +11,38 @@ void flash_storage_init(void) {
     FLASH->MODEKEYR = FLASH_KEY2;
 }
 
-void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes) {
-    if (profile_idx >= TOTAL_PROFILES_COUNT || !active_codes) return;
+void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes, char *active_name) {
+    if (profile_idx >= TOTAL_PROFILES_COUNT) return;
 
     uint32_t page_addr = FLASH_PROFILE_BASE_ADDR + (profile_idx * FLASH_PROFILE_PAGE_SIZE);
     const uint32_t *ptr = (const uint32_t *)page_addr;
 
-    // ตรวจสอบ Magic Word ว่าเคยบันทึกโปรไฟล์นี้ไว้แล้วหรือไม่
-    if (ptr[12] == FLASH_PROFILE_MAGIC) {
-        for (int i = 0; i < 12; i++) {
-            active_codes[i] = ptr[i];
+    // 1. โหลดรหัสปุ่ม 12 ปุ่ม
+    if (active_codes) {
+        if (ptr[12] == FLASH_PROFILE_MAGIC) {
+            for (int i = 0; i < 12; i++) {
+                active_codes[i] = ptr[i];
+            }
+        } else {
+            for (int i = 0; i < 12; i++) {
+                active_codes[i] = default_presets[profile_idx][i];
+            }
         }
-    } else {
-        // ถ้ายังไม่เคยบันทึก ให้ดึงค่าจาก Factory Default Presets
-        for (int i = 0; i < 12; i++) {
-            active_codes[i] = default_presets[profile_idx][i];
+    }
+
+    // 2. โหลดชื่อโปรไฟล์
+    if (active_name) {
+        if (ptr[12] == FLASH_PROFILE_MAGIC && ptr[13] != 0 && ptr[13] != 0xFFFFFFFF) {
+            memcpy(active_name, (const char *)&ptr[13], 7);
+            active_name[7] = '\0';
+        } else {
+            strncpy(active_name, profile_names[profile_idx], 7);
+            active_name[7] = '\0';
         }
     }
 }
 
-void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes) {
+void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes, const char *active_name) {
     if (profile_idx >= TOTAL_PROFILES_COUNT || !active_codes) return;
 
     uint32_t page_addr = FLASH_PROFILE_BASE_ADDR + (profile_idx * FLASH_PROFILE_PAGE_SIZE);
@@ -54,12 +66,27 @@ void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes) {
     FLASH->ADDR = (intptr_t)ptr;
     while (FLASH->STATR & FLASH_STATR_BSY);
 
-    // 4. โหลดข้อมูล 16 Words (12 ปุ่ม + Magic Word + Reserved) เข้าสู่ Buffer
+    // 4. โหลดข้อมูล 16 Words (12 ปุ่ม + Magic Word + Name 8 bytes + Reserved) เข้าสู่ Buffer
+    char name_buf[8] = {0};
+    if (active_name) {
+        strncpy(name_buf, active_name, 7);
+    } else {
+        strncpy(name_buf, profile_names[profile_idx], 7);
+    }
+
+    uint32_t name_w0 = 0, name_w1 = 0;
+    memcpy(&name_w0, &name_buf[0], 4);
+    memcpy(&name_w1, &name_buf[4], 4);
+
     for (int i = 0; i < 16; i++) {
         if (i < 12) {
             ptr[i] = active_codes[i];
         } else if (i == 12) {
             ptr[i] = FLASH_PROFILE_MAGIC;
+        } else if (i == 13) {
+            ptr[i] = name_w0;
+        } else if (i == 14) {
+            ptr[i] = name_w1;
         } else {
             ptr[i] = 0;
         }
@@ -71,8 +98,8 @@ void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes) {
     FLASH->CTLR = CR_PAGE_PG | CR_STRT_Set;
     while (FLASH->STATR & FLASH_STATR_BSY);
 
-    // 6. ล็อก Flash เพื่อความปลอดภัย
+    // 6. ล็อก Flash
     FLASH->CTLR = CR_LOCK_Set;
 
-    printf("[Flash] Successfully saved Profile %02d to address 0x%08lX\r\n", profile_idx + 1, page_addr);
+    printf("[Flash] Saved Profile %02d (Name: '%s') to 0x%08lX\r\n", profile_idx + 1, name_buf, page_addr);
 }

@@ -36,4 +36,7 @@ void oled_render_ir_captured_screen(const char *header, uint32_t ir_code);
 // ฟังก์ชันเรนเดอร์หน้าจอเมื่อกวาดยิงรหัสในโหมด NEW (แสดงลำดับ รหัส และวิธีเซฟ)
 void oled_render_new_code_screen(const char *header, uint32_t code, uint16_t cur_idx, uint16_t total_count);
 
+// ฟังก์ชันเรนเดอร์หน้าจอแก้ไขชื่อโปรไฟล์ (โหมด RENAME)
+void oled_render_rename_screen(const char *name, uint8_t cursor_pos, uint8_t blink_state, uint8_t profile_idx, uint8_t is_editing);
+
 void oled_update(void);

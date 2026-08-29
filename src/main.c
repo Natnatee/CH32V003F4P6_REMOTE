@@ -10,27 +10,31 @@
 
 void SetupDebugPrintf(void);
 
-// 3 โหมดการทำงาน
+// 4 โหมดการทำงาน
 typedef enum {
     MODE_SEND = 0,
     MODE_LEARN = 1,
-    MODE_NEW = 2
+    MODE_NEW = 2,
+    MODE_RENAME = 3
 } RemoteMode;
 
-static const char *mode_names[3] = {
+static const char *mode_names[4] = {
     "SEND",
     "LRN ",
-    "NEW "
+    "NEW ",
+    "NAME"
 };
 
-static const char *mode_select_labels[3] = {
+static const char *mode_select_labels[4] = {
     "[ SEND ]",
     "[ LEARN ]",
-    "[  NEW  ]"
+    "[  NEW  ]",
+    "[ RENAME ]"
 };
 
 // บัฟเฟอร์ใน RAM สำหรับถือเฉพาะโปรไฟล์ปัจจุบันที่กำลังใช้งาน (12 ปุ่ม = 48 ไบต์เท่านั้น!)
 static uint32_t active_codes[12];
+static char current_profile_name[8];
 
 // แปลงหมายเลขปุ่ม (1..15) เป็น Index ในตาราง (0..11)
 static int key_to_index(uint8_t key) {
@@ -50,6 +54,22 @@ static int key_to_index(uint8_t key) {
         default: return -1;
     }
 }
+
+// ตารางตัวอักษรสำหรับปุ่ม 1..15 ในโหมด RENAME
+static const char *key_letters[12] = {
+    "AB",       // Key 1
+    "CD",       // Key 2
+    "EF",       // Key 3
+    "GH",       // Key 5
+    "IJ",       // Key 6
+    "KL",       // Key 7
+    "MN",       // Key 9
+    "OP",       // Key 10
+    "QR",       // Key 11
+    "ST",       // Key 13
+    "UV",       // Key 14
+    "WXYZ "     // Key 15 (มี Space/ลบ)
+};
 
 // สร้างข้อความ Footer ปกติ เช่น "SEND 05/16"
 static void get_footer_str(char *buf, RemoteMode mode, uint8_t profile_idx) {
@@ -81,7 +101,7 @@ int main()
     Delay_Ms(200);
 
     printf("\r\n=========================================\r\n");
-    printf("   CH32V003 Smart Remote + Mode NEW\r\n");
+    printf("   CH32V003 Smart Remote with RENAME\r\n");
     printf("   IR RX Pin : PD0 (VS1838B)\r\n");
     printf("   IR TX Pin : PD4 (38kHz PWM)\r\n");
     printf("   Flash NVM : 16 Profiles @ 0x08003C00\r\n");
@@ -97,11 +117,11 @@ int main()
     // ตัวแปรสถานะระบบ
     RemoteMode current_mode = MODE_SEND;
     RemoteMode selected_mode = MODE_SEND;
-    uint8_t current_profile = 0; // 0 = SAMSUNG (Profile 01)
+    uint8_t current_profile = 0; // 0 = Profile 01
     uint8_t mode_select_active = 0;
 
-    // โหลดข้อมูลปุ่มของ Profile 01 จาก Flash ROM เข้าสู่ RAM
-    flash_load_profile(current_profile, active_codes);
+    // โหลดข้อมูลปุ่มและชื่อของ Profile 01 จาก Flash ROM เข้าสู่ RAM
+    flash_load_profile(current_profile, active_codes, current_profile_name);
 
     // ตัวแปรสำหรับโหมด LEARN
     uint8_t ir_captured = 0;
@@ -112,9 +132,14 @@ int main()
     uint8_t new_preview_active = 0;
     uint32_t new_preview_ticks = 0;
 
+    // ตัวแปรสำหรับโหมด RENAME
+    uint8_t rename_editing = 0;
+    uint8_t rename_cursor = 0;
+    char edit_name_buf[8] = {0};
+
     char footer_buf[16];
     get_footer_str(footer_buf, current_mode, current_profile);
-    oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
+    oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
 
     uint8_t last_key = 0;
     uint8_t row = 0, col = 0;
@@ -132,9 +157,7 @@ int main()
                 captured_code = new_ir_code;
                 ir_captured = 1;
                 printf("\r\n[IR RX] >>> Received Signal: 0x%08lX <<<\r\n", captured_code);
-
-                // เปลี่ยนหน้าจอกลางเป็นหน้ารหัสที่อ่านได้ทันที
-                oled_render_ir_captured_screen(profile_names[current_profile], captured_code);
+                oled_render_ir_captured_screen(current_profile_name, captured_code);
             }
         }
 
@@ -147,7 +170,7 @@ int main()
                 new_preview_active = 0;
                 new_preview_ticks = 0;
                 get_footer_str(footer_buf, current_mode, current_profile);
-                oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
+                oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
             }
         }
 
@@ -170,7 +193,7 @@ int main()
                     ir_captured = 0;
                     printf("[IR RX] Learn Cancelled by user\r\n");
                     get_footer_str(footer_buf, current_mode, current_profile);
-                    oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
+                    oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                 }
                 else
                 {
@@ -179,17 +202,16 @@ int main()
                     if (idx >= 0)
                     {
                         active_codes[idx] = captured_code;
-                        flash_save_profile(current_profile, active_codes); // บันทึกลง Flash ถาวร!
+                        flash_save_profile(current_profile, active_codes, current_profile_name);
                         ir_captured = 0;
 
                         printf("[IR RX] >> SAVED 0x%08lX to Button %d (Profile %02d: %s) <<\r\n",
-                               captured_code, key, current_profile + 1, profile_names[current_profile]);
+                               captured_code, key, current_profile + 1, current_profile_name);
 
-                        // กลับมาหน้าตาราง 3x4 พร้อมถมสีปุ่มที่เพิ่งเซฟ
                         get_footer_str(footer_buf, current_mode, current_profile);
-                        oled_render_grid_screen(profile_names[current_profile], footer_buf, key, 1, active_codes);
+                        oled_render_grid_screen(current_profile_name, footer_buf, key, 1, active_codes);
                         Delay_Ms(300);
-                        oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
+                        oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                     }
                 }
             }
@@ -204,7 +226,7 @@ int main()
                     new_brute_idx = (new_brute_idx + 1) % TOTAL_BRUTE_COMMANDS;
                     uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
                     ir_send_code(test_code);
-                    oled_render_new_code_screen(profile_names[current_profile], test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
+                    oled_render_new_code_screen(current_profile_name, test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
                     new_preview_ticks = 0;
                 }
                 else if (key == 8)
@@ -213,7 +235,7 @@ int main()
                     new_brute_idx = (new_brute_idx + TOTAL_BRUTE_COMMANDS - 1) % TOTAL_BRUTE_COMMANDS;
                     uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
                     ir_send_code(test_code);
-                    oled_render_new_code_screen(profile_names[current_profile], test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
+                    oled_render_new_code_screen(current_profile_name, test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
                     new_preview_ticks = 0;
                 }
                 else if (key == 12)
@@ -221,7 +243,7 @@ int main()
                     // ปุ่ม 12: OK ยิงรหัสเดิมซ้ำอีกรอบ (RETRY)
                     uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
                     ir_send_code(test_code);
-                    oled_render_new_code_screen(profile_names[current_profile], test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
+                    oled_render_new_code_screen(current_profile_name, test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
                     new_preview_ticks = 0;
                 }
                 else if (key == 16)
@@ -230,7 +252,7 @@ int main()
                     new_preview_active = 0;
                     new_preview_ticks = 0;
                     get_footer_str(footer_buf, current_mode, current_profile);
-                    oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
+                    oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                 }
                 else
                 {
@@ -240,40 +262,155 @@ int main()
                     {
                         uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
                         active_codes[idx] = test_code;
-                        flash_save_profile(current_profile, active_codes); // เซฟลง Flash!
+                        flash_save_profile(current_profile, active_codes, current_profile_name);
                         new_preview_active = 0;
                         new_preview_ticks = 0;
 
                         printf("[NEW Mode] >> SAVED Code 0x%08lX to Button %d (Profile %02d: %s) <<\r\n",
-                               test_code, key, current_profile + 1, profile_names[current_profile]);
+                               test_code, key, current_profile + 1, current_profile_name);
 
                         get_footer_str(footer_buf, current_mode, current_profile);
-                        oled_render_grid_screen(profile_names[current_profile], footer_buf, key, 1, active_codes);
+                        oled_render_grid_screen(current_profile_name, footer_buf, key, 1, active_codes);
                         Delay_Ms(300);
-                        oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
+                        oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                     }
                 }
             }
             // ==========================================
-            // กรณีที่ 3: หน้าเลือกโหมด (Footer กระพริบ)
+            // กรณีที่ 3: โหมด RENAME (แก้ไขชื่อโปรไฟล์)
+            // ==========================================
+            else if (current_mode == MODE_RENAME && !mode_select_active)
+            {
+                if (rename_editing == 0)
+                {
+                    // --- ขั้นตอนเลือก Profile ที่ต้องการแก้ชื่อ ---
+                    if (key == 4)
+                    {
+                        // ปุ่ม 4: UP เลื่อน Profile ถัดไป
+                        current_profile = (current_profile + 1) % TOTAL_PROFILES_COUNT;
+                        flash_load_profile(current_profile, active_codes, current_profile_name);
+                        oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
+                    }
+                    else if (key == 8)
+                    {
+                        // ปุ่ม 8: DOWN เลื่อน Profile ก่อนหน้า
+                        current_profile = (current_profile + TOTAL_PROFILES_COUNT - 1) % TOTAL_PROFILES_COUNT;
+                        flash_load_profile(current_profile, active_codes, current_profile_name);
+                        oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
+                    }
+                    else if (key == 12)
+                    {
+                        // ปุ่ม 12: OK ยืนยันเข้าสู่การพิมพ์/แก้ไขชื่อ (Cursor Active)
+                        rename_editing = 1;
+                        rename_cursor = 0;
+                        memset(edit_name_buf, ' ', 7);
+                        edit_name_buf[7] = '\0';
+                        int cur_len = strlen(current_profile_name);
+                        for (int i = 0; i < cur_len && i < 7; i++) {
+                            edit_name_buf[i] = current_profile_name[i];
+                        }
+                        oled_render_rename_screen(edit_name_buf, rename_cursor, 1, current_profile, 1);
+                        printf("[Rename] Editing Profile %02d Name: '%s'\r\n", current_profile + 1, edit_name_buf);
+                    }
+                    else if (key == 16)
+                    {
+                        // ปุ่ม 16: BACK เข้าสู่การเลือกโหมด
+                        mode_select_active = 1;
+                        selected_mode = current_mode;
+                        mode_blink_state = 1;
+                        blink_tick = 0;
+                        oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
+                    }
+                }
+                else
+                {
+                    // --- ขั้นตอนกำลังพิมพ์ชื่อ (Cursor Active เลื่อนได้ครบทั้ง 7 ช่อง) ---
+                    if (key == 4)
+                    {
+                        // ปุ่ม 4: เลื่อน Cursor ซ้าย (-1)
+                        rename_cursor = (rename_cursor + 6) % 7;
+                        oled_render_rename_screen(edit_name_buf, rename_cursor, 1, current_profile, 1);
+                    }
+                    else if (key == 8)
+                    {
+                        // ปุ่ม 8: เลื่อน Cursor ขวา (+1)
+                        rename_cursor = (rename_cursor + 1) % 7;
+                        oled_render_rename_screen(edit_name_buf, rename_cursor, 1, current_profile, 1);
+                    }
+                    else if (key == 12)
+                    {
+                        // ปุ่ม 12: OK บันทึกชื่อลง Flash ROM ถาวร!
+                        // ตัดช่องว่างส่วนท้ายออก
+                        for (int i = 6; i >= 0; i--) {
+                            if (edit_name_buf[i] == ' ') edit_name_buf[i] = '\0';
+                            else break;
+                        }
+                        if (strlen(edit_name_buf) == 0) {
+                            strncpy(edit_name_buf, profile_names[current_profile], 7);
+                        }
+                        strncpy(current_profile_name, edit_name_buf, 7);
+                        current_profile_name[7] = '\0';
+
+                        flash_save_profile(current_profile, active_codes, current_profile_name);
+                        rename_editing = 0;
+                        printf("[Rename] >> SAVED New Name: '%s' to Profile %02d <<\r\n", current_profile_name, current_profile + 1);
+
+                        oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
+                    }
+                    else if (key == 16)
+                    {
+                        // ปุ่ม 16: CANCEL ยกเลิก ไม่เซฟชื่อ
+                        rename_editing = 0;
+                        oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
+                    }
+                    else
+                    {
+                        // ปุ่มในตาราง 1..15: วนตัวอักษรลงที่ตำแหน่ง Cursor
+                        int idx = key_to_index(key);
+                        if (idx >= 0)
+                        {
+                            const char *letters = key_letters[idx];
+                            int let_len = strlen(letters);
+
+                            // หาตัวอักษรปัจจุบันในกลุ่ม
+                            char cur_c = edit_name_buf[rename_cursor];
+                            int found_pos = -1;
+                            for (int i = 0; i < let_len; i++) {
+                                if (letters[i] == cur_c) {
+                                    found_pos = i;
+                                    break;
+                                }
+                            }
+
+                            // วนไปตัวอักษรถัดไปในกลุ่ม
+                            int next_pos = (found_pos + 1) % let_len;
+                            edit_name_buf[rename_cursor] = letters[next_pos];
+
+                            oled_render_rename_screen(edit_name_buf, rename_cursor, 1, current_profile, 1);
+                        }
+                    }
+                }
+            }
+            // ==========================================
+            // กรณีที่ 4: หน้าเลือกโหมด (Footer กระพริบ)
             // ==========================================
             else if (mode_select_active)
             {
                 if (key == 4)
                 {
                     // ปุ่ม 4: UP
-                    selected_mode = (RemoteMode)((selected_mode + 2) % 3);
+                    selected_mode = (RemoteMode)((selected_mode + 3) % 4);
                     mode_blink_state = 1;
                     blink_tick = 0;
-                    oled_render_grid_screen(profile_names[current_profile], mode_select_labels[selected_mode], 0, 0, active_codes);
+                    oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
                 }
                 else if (key == 8)
                 {
                     // ปุ่ม 8: DOWN
-                    selected_mode = (RemoteMode)((selected_mode + 1) % 3);
+                    selected_mode = (RemoteMode)((selected_mode + 1) % 4);
                     mode_blink_state = 1;
                     blink_tick = 0;
-                    oled_render_grid_screen(profile_names[current_profile], mode_select_labels[selected_mode], 0, 0, active_codes);
+                    oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
                 }
                 else if (key == 12)
                 {
@@ -282,20 +419,30 @@ int main()
                     mode_select_active = 0;
                     new_preview_active = 0;
                     new_brute_idx = 0;
-                    get_footer_str(footer_buf, current_mode, current_profile);
-                    oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
+                    rename_editing = 0;
+
+                    if (current_mode == MODE_RENAME) {
+                        oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
+                    } else {
+                        get_footer_str(footer_buf, current_mode, current_profile);
+                        oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+                    }
                     printf("[Mode] Switched to: %s\r\n", mode_names[current_mode]);
                 }
                 else if (key == 16)
                 {
                     // ปุ่ม 16: BACK ยกเลิก
                     mode_select_active = 0;
-                    get_footer_str(footer_buf, current_mode, current_profile);
-                    oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
+                    if (current_mode == MODE_RENAME) {
+                        oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
+                    } else {
+                        get_footer_str(footer_buf, current_mode, current_profile);
+                        oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+                    }
                 }
             }
             // ==========================================
-            // กรณีที่ 4: อยู่ในหน้าตาราง 3x4 ปกติ
+            // กรณีที่ 5: อยู่ในหน้าตาราง 3x4 ปกติ (SEND / LEARN / NEW)
             // ==========================================
             else
             {
@@ -306,7 +453,7 @@ int main()
                     selected_mode = current_mode;
                     mode_blink_state = 1;
                     blink_tick = 0;
-                    oled_render_grid_screen(profile_names[current_profile], mode_select_labels[selected_mode], 0, 0, active_codes);
+                    oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
                 }
                 else if (current_mode == MODE_NEW && (key == 4 || key == 8))
                 {
@@ -319,7 +466,7 @@ int main()
 
                     uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
                     ir_send_code(test_code);
-                    oled_render_new_code_screen(profile_names[current_profile], test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
+                    oled_render_new_code_screen(current_profile_name, test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
                     new_preview_active = 1;
                     new_preview_ticks = 0;
                 }
@@ -327,19 +474,19 @@ int main()
                 {
                     // ปุ่ม 4: UP เลื่อน Profile ถัดไป (01 ➡️ 02 ➡️ ... ➡️ 16)
                     current_profile = (current_profile + 1) % TOTAL_PROFILES_COUNT;
-                    flash_load_profile(current_profile, active_codes); // โหลดโปรไฟล์จาก Flash
+                    flash_load_profile(current_profile, active_codes, current_profile_name);
                     get_footer_str(footer_buf, current_mode, current_profile);
-                    oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
-                    printf("[Profile] Loaded: %02d (%s)\r\n", current_profile + 1, profile_names[current_profile]);
+                    oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+                    printf("[Profile] Loaded: %02d (%s)\r\n", current_profile + 1, current_profile_name);
                 }
                 else if (key == 8)
                 {
                     // ปุ่ม 8: DOWN เลื่อน Profile ก่อนหน้า (16 ⬅️ 15 ⬅️ ...)
                     current_profile = (current_profile + TOTAL_PROFILES_COUNT - 1) % TOTAL_PROFILES_COUNT;
-                    flash_load_profile(current_profile, active_codes); // โหลดโปรไฟล์จาก Flash
+                    flash_load_profile(current_profile, active_codes, current_profile_name);
                     get_footer_str(footer_buf, current_mode, current_profile);
-                    oled_render_grid_screen(profile_names[current_profile], footer_buf, 0, 0, active_codes);
-                    printf("[Profile] Loaded: %02d (%s)\r\n", current_profile + 1, profile_names[current_profile]);
+                    oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+                    printf("[Profile] Loaded: %02d (%s)\r\n", current_profile + 1, current_profile_name);
                 }
                 else if (key == 12)
                 {
@@ -367,9 +514,9 @@ int main()
                     // สั่งกระพริบช่องปุ่ม 3 ครั้ง
                     for (int blink = 0; blink < 3; blink++)
                     {
-                        oled_render_grid_screen(profile_names[current_profile], footer_buf, key, 1, active_codes);
+                        oled_render_grid_screen(current_profile_name, footer_buf, key, 1, active_codes);
                         Delay_Ms(70);
-                        oled_render_grid_screen(profile_names[current_profile], footer_buf, key, 0, active_codes);
+                        oled_render_grid_screen(current_profile_name, footer_buf, key, 0, active_codes);
                         Delay_Ms(70);
                     }
                 }
@@ -380,23 +527,28 @@ int main()
             last_key = 0;
         }
 
-        // --- 4. การกระพริบ Footer เมื่ออยู่ในหน้า Mode Select ---
-        if (mode_select_active)
+        // --- 4. การกระพริบ Cursor ในโหมด RENAME และกระพริบ Footer ในหน้า Mode Select ---
+        blink_tick++;
+        if (blink_tick >= 15)
         {
-            blink_tick++;
-            if (blink_tick >= 15)
-            {
-                blink_tick = 0;
-                mode_blink_state = !mode_blink_state;
+            blink_tick = 0;
+            mode_blink_state = !mode_blink_state;
 
+            if (mode_select_active)
+            {
                 if (mode_blink_state)
                 {
-                    oled_render_grid_screen(profile_names[current_profile], mode_select_labels[selected_mode], 0, 0, active_codes);
+                    oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
                 }
                 else
                 {
-                    oled_render_grid_screen(profile_names[current_profile], "", 0, 0, active_codes);
+                    oled_render_grid_screen(current_profile_name, "", 0, 0, active_codes);
                 }
+            }
+            else if (current_mode == MODE_RENAME && rename_editing)
+            {
+                // กระพริบ Cursor ใต้ตัวอักษรที่กำลังแก้
+                oled_render_rename_screen(edit_name_buf, rename_cursor, mode_blink_state, current_profile, 1);
             }
         }
 

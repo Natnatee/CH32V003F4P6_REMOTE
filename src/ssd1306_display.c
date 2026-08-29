@@ -466,6 +466,76 @@ void oled_render_new_code_screen(const char *header, uint32_t code, uint16_t cur
     oled_update();
 }
 
+// ตัวอักษรบนปุ่มตาราง 3x4 สำหรับโหมด RENAME
+static const char *rename_key_labels[4][3] = {
+    { "AB", "CD", "EF" },
+    { "GH", "IJ", "KL" },
+    { "MN", "OP", "QR" },
+    { "ST", "UV", "WZ" }
+};
+
+// เรนเดอร์หน้าจอแก้ไขชื่อโปรไฟล์ (โหมด RENAME)
+void oled_render_rename_screen(const char *name, uint8_t cursor_pos, uint8_t blink_state, uint8_t profile_idx, uint8_t is_editing) {
+    oled_clear_buffer();
+
+    // 1. [ส่วนบน] Header: แสดงชื่อโปรไฟล์ 7 ช่องตัวอักษร
+    // คำนวณตำแหน่ง 7 ช่อง (ช่องละ 5px + ช่องว่าง 3px = 53px กึ่งกลางจอ 64px)
+    int16_t start_x = 5;
+
+    for (int i = 0; i < 7; i++) {
+        char ch = ' ';
+        if (name && i < (int)strlen(name)) {
+            ch = name[i];
+        }
+
+        int16_t cx = start_x + (i * 8);
+
+        // วาดตัวอักษร (ถ้าไม่ใช่ช่องว่าง)
+        if (ch != ' ') {
+            oled_draw_char_large(cx, 4, ch);
+        }
+
+        // วาด Cursor ใต้ตัวอักษร (กระพริบที่ตำแหน่ง cursor_pos 0..6)
+        if (is_editing && i == cursor_pos && blink_state) {
+            oled_fill_rect(cx, 16, 5, 2, 1);
+        }
+    }
+    oled_fill_rect(2, 18, 60, 1, 1); // เส้นคั่นบน
+
+    // 2. [ส่วนกลาง] ตาราง 3x4 ขนาดเต็ม (17x17 px) แสดงตัวอักษรประจำปุ่ม
+    for (uint8_t r = 0; r < 4; r++) {
+        for (uint8_t c = 0; c < 3; c++) {
+            int16_t bx = 3 + c * (17 + 3);  // X: 3, 23, 43
+            int16_t by = 21 + r * (17 + 3); // Y: 21, 41, 61, 81
+            int16_t bw = 17;
+            int16_t bh = 17;
+
+            // ตีกรอบสีขาว
+            oled_draw_rect(bx, by, bw, bh, 1);
+
+            // วาดตัวอักษร 2 ตัว (AB, CD, ..., WZ) กึ่งกลางกล่อง
+            oled_draw_str(bx + 3, by + 5, rename_key_labels[r][c], 1);
+        }
+    }
+
+    // 3. [ส่วนล่าง] Footer: "NAME 05/16"
+    oled_fill_rect(2, 103, 60, 1, 1);
+
+    char footer_str[16];
+    uint8_t p = profile_idx + 1;
+    footer_str[0] = 'N'; footer_str[1] = 'A'; footer_str[2] = 'M'; footer_str[3] = 'E';
+    footer_str[4] = ' ';
+    footer_str[5] = '0' + (p / 10);
+    footer_str[6] = '0' + (p % 10);
+    footer_str[7] = '/';
+    footer_str[8] = '1';
+    footer_str[9] = '6';
+    footer_str[10] = '\0';
+    oled_draw_str((64 - 10 * 6) / 2, 111, footer_str, 1);
+
+    oled_update();
+}
+
 void oled_update(void) {
     for (uint8_t page = 0; page < 8; page++) {
         ssd1306_write_cmd(0xB0 + page);

@@ -7,37 +7,33 @@
 #include "flash_storage.h"
 #include "ir_database.h"
 #include "tetris.h"
-#include "flappy.h"
 #include "calc.h"
 
-// 7 โหมดการทำงาน (รวม TETRIS, BIRD และ CALC)
+// 6 โหมดการทำงานหลัก (SEND, LEARN, NEW, RENAME, TETRIS, CALC)
 typedef enum {
     MODE_SEND = 0,
     MODE_LEARN = 1,
     MODE_NEW = 2,
     MODE_RENAME = 3,
     MODE_TETRIS = 4,
-    MODE_BIRD = 5,
-    MODE_CALC = 6
+    MODE_CALC = 5
 } RemoteMode;
 
-static const char *mode_names[7] = {
+static const char *mode_names[6] = {
     "SEND",
     "LRN ",
     "NEW ",
     "NAME",
     "TETR",
-    "BIRD",
     "CALC"
 };
 
-static const char *mode_select_labels[7] = {
+static const char *mode_select_labels[6] = {
     "[ SEND ]",
     "[ LEARN ]",
     "[  NEW  ]",
     "[ RENAME ]",
     "[ TETRIS ]",
-    "[  BIRD  ]",
     "[  CALC  ]"
 };
 
@@ -173,32 +169,7 @@ int main()
             continue;
         }
 
-        // --- 0.2 โหมดพิเศษ: FLAPPY BIRD GAME ---
-        if (current_mode == MODE_BIRD && !mode_select_active)
-        {
-            uint8_t key = keypad_scan(&row, &col);
-            uint8_t is_new = (key != 0 && key != last_key);
-            if (key != 0) {
-                last_key = key;
-                flappy_handle_key(key, is_new);
-            } else {
-                last_key = 0;
-            }
-
-            if (flappy_should_exit()) {
-                current_mode = MODE_SEND;
-                get_footer_str(footer_buf, current_mode, current_profile);
-                oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
-            } else {
-                flappy_update();
-                flappy_render();
-            }
-
-            Delay_Ms(20);
-            continue;
-        }
-
-        // --- 0.3 โหมดพิเศษ: CALCULATOR ---
+        // --- 0.2 โหมดพิเศษ: CALCULATOR ---
         if (current_mode == MODE_CALC && !mode_select_active)
         {
             uint8_t key = keypad_scan(&row, &col);
@@ -457,7 +428,7 @@ int main()
                 if (key == 4)
                 {
                     // ปุ่ม 4: UP
-                    selected_mode = (RemoteMode)((selected_mode + 6) % 7);
+                    selected_mode = (RemoteMode)((selected_mode + 5) % 6);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -465,7 +436,7 @@ int main()
                 else if (key == 8)
                 {
                     // ปุ่ม 8: DOWN
-                    selected_mode = (RemoteMode)((selected_mode + 1) % 7);
+                    selected_mode = (RemoteMode)((selected_mode + 1) % 6);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -482,9 +453,6 @@ int main()
                     if (current_mode == MODE_TETRIS) {
                         tetris_init();
                         tetris_render();
-                    } else if (current_mode == MODE_BIRD) {
-                        flappy_init();
-                        flappy_render();
                     } else if (current_mode == MODE_CALC) {
                         calc_init();
                         calc_render();

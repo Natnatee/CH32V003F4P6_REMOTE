@@ -1,9 +1,14 @@
 # CH32V003F4P6 Smart Remote Project
 
 โปรเจกต์ **Smart Remote** บนบอร์ดพัฒนา **CH32V003F4P6** (TSSOP-20) ผ่านเฟรมเวิร์ก `ch32v003fun`:
-- 4x4 Matrix Keypad (16 สวิตช์ปุ่มกด) เสียบเรียง 8 พินฝั่งซ้ายของบอร์ด
-- จอ 0.96" I2C OLED SSD1306 โหมดแนวตั้ง Portrait (64x128) แสดง Header `SAMSUNG` และตัวเลข 7-Segment (1-16)
-- ระบบ Serial Debug Monitor ผ่านสาย SWDIO (`PD1`)
+- **UI 3 ส่วน (Portrait 64x128):**
+  - **บน (Header):** โลโก้ `SAMSUNG` 56px
+  - **กลาง (Middle):** ตาราง 3x4 (12 ช่องปุ่ม) พร้อมเอฟเฟกต์กระพริบช่องเมื่อกดปุ่ม
+  - **ล่าง (Footer):** แถบสถานะการทำงาน (เช่น `READY`, `KEY: 01`, `NAV: UP`)
+- **4x4 Keypad Mapping:**
+  - 12 ปุ่มตารางซ้าย: `1, 2, 3`, `5, 6, 7`, `9, 10, 11`, `13, 14, 15`
+  - 4 ปุ่ม Setting / Nav ขวาสุด: `4 (UP)`, `8 (DOWN)`, `12 (OK)`, `16 (BACK)`
+
 
 ## Hardware
 - **MCU**: WCH CH32V003F4P6 (32-bit RISC-V QingKe V2A @ 48MHz, 16KB Flash, 2KB SRAM)

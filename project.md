@@ -1,10 +1,18 @@
 # CH32V003F4P6 Smart Remote Project
 
 ## Overview
-โปรเจกต์พัฒนาระบบ **Smart Remote** บนไมโครคอนโทรลเลอร์ **CH32V003F4P6** (TSSOP-20) โดยย้ายโลจิกมาจากบอร์ด PY32F002A:
-1. จอแสดงผล 0.96" OLED (SSD1306) โหมดแนวตั้ง Portrait (64x128) แสดง Header `SAMSUNG` + ตัวเลข 7-Segment ขนาดใหญ่ (1-16)
-2. สวิตช์ปุ่มกด 4x4 Matrix Keypad (16 ปุ่ม) เสียบพินเรียงแถวยาวฝั่งซ้ายของบอร์ด
+โปรเจกต์พัฒนาระบบ **Smart Remote** บนไมโครคอนโทรลเลอร์ **CH32V003F4P6** (TSSOP-20):
+1. **หน้าจอ OLED 3 ส่วน (Portrait 64x128):**
+   - **ส่วนบน (Header):** โลโก้ `SAMSUNG` 56px พร้อมเส้นคั่น
+   - **ส่วนกลาง (Middle):** ตาราง 3x4 (12 ช่องปุ่ม: 1..3, 5..7, 9..11, 13..15) พร้อมเอฟเฟกต์กระพริบไฮไลต์เมื่อกดปุ่ม
+   - **ส่วนล่าง (Footer):** แถบแสดงสถานะ (เช่น `READY`, `KEY: 01`, `NAV: UP/DOWN/OK/BACK`)
+2. **ปุ่ม Setting / Navigation 4 ปุ่ม (Column ขวาสุด):**
+   - ปุ่ม `4`: UP (เลื่อนขึ้น)
+   - ปุ่ม `8`: DOWN (เลื่อนลง)
+   - ปุ่ม `12`: OK (ตกลง/เลือก)
+   - ปุ่ม `16`: BACK / CANCEL (ย้อนกลับ/ยกเลิก)
 3. ระบบ SDI Debug Printf ผ่านสาย SWDIO (`PD1`)
+
 
 ## Hardware
 - **MCU**: WCH CH32V003F4P6 (32-bit RISC-V QingKe V2A @ 48MHz, 16KB Flash, 2KB SRAM)

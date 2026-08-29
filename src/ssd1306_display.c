@@ -1,4 +1,5 @@
 #include "ssd1306.h"
+#include <string.h>
 
 // 1KB RAM Framebuffer (128x64 = 1024 bytes) บน SRAM 2KB ของ CH32V003
 static uint8_t oled_buffer[1024];
@@ -230,72 +231,59 @@ void oled_fill_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t color) {
     }
 }
 
-void oled_draw_char(int16_t x, int16_t y, char c) {
+void oled_draw_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t color) {
+    for (int16_t i = 0; i < w; i++) {
+        oled_draw_pixel(x + i, y, color);
+        oled_draw_pixel(x + i, y + h - 1, color);
+    }
+    for (int16_t j = 0; j < h; j++) {
+        oled_draw_pixel(x, y + j, color);
+        oled_draw_pixel(x + w - 1, y + j, color);
+    }
+}
+
+void oled_draw_char(int16_t x, int16_t y, char c, uint8_t color) {
     if (c < 32 || c > 126) c = ' ';
     uint8_t idx = c - 32;
     for (uint8_t col = 0; col < 6; col++) {
         uint8_t line = font6x8[idx][col];
         for (uint8_t row = 0; row < 8; row++) {
             if (line & (1U << row)) {
+                oled_draw_pixel(x + col, y + row, color);
+            } else if (!color) {
+                // If drawing inverted (color=0), draw background as white
                 oled_draw_pixel(x + col, y + row, 1);
             }
         }
     }
 }
 
-void oled_draw_str(int16_t x, int16_t y, const char *str) {
+void oled_draw_str(int16_t x, int16_t y, const char *str, uint8_t color) {
     while (*str) {
-        oled_draw_char(x, y, *str++);
+        oled_draw_char(x, y, *str++, color);
         x += 6;
     }
 }
 
-// 7-Segment Big Digit
-void oled_draw_digit(int16_t x, int16_t y, int16_t w, int16_t h, int16_t t, uint8_t digit) {
-    static const uint8_t seg_masks[10] = {
-        0x3F, // 0: A B C D E F
-        0x06, // 1: B C
-        0x5B, // 2: A B D E G
-        0x4F, // 3: A B C D G
-        0x66, // 4: B C F G
-        0x6D, // 5: A C D F G
-        0x7D, // 6: A C D E F G
-        0x07, // 7: A B C
-        0x7F, // 8: A B C D E F G
-        0x6F  // 9: A B C D F G
-    };
-    if (digit > 9) return;
-    uint8_t mask = seg_masks[digit];
-    int16_t half_h = h / 2;
-
-    if (mask & (1 << 0)) oled_fill_rect(x + t, y, w - (2 * t), t, 1);                         // Seg A
-    if (mask & (1 << 1)) oled_fill_rect(x + w - t, y + t, t, half_h - t, 1);                  // Seg B
-    if (mask & (1 << 2)) oled_fill_rect(x + w - t, y + half_h, t, half_h - t, 1);             // Seg C
-    if (mask & (1 << 3)) oled_fill_rect(x + t, y + h - t, w - (2 * t), t, 1);                 // Seg D
-    if (mask & (1 << 4)) oled_fill_rect(x, y + half_h, t, half_h - t, 1);                     // Seg E
-    if (mask & (1 << 5)) oled_fill_rect(x, y + t, t, half_h - t, 1);                          // Seg F
-    if (mask & (1 << 6)) oled_fill_rect(x + t, y + half_h - (t / 2), w - (2 * t), t, 1);     // Seg G
-}
-
 // วาดตัวอักษร SAMSUNG รวมกว้าง 56px พร้อมเว้นระยะห่างระหว่างตัวอักษร (Letter Spacing 3px)
 void oled_draw_samsung_56px(int16_t x, int16_t y) {
-    // 1. S (กว้าง 5, สูง 11) -> X: 4
-    int16_t s1 = 4;
+    // S
+    int16_t s1 = x;
     oled_fill_rect(s1 + 1, y + 0, 4, 1, 1);
     oled_fill_rect(s1 + 0, y + 1, 1, 4, 1);
     oled_fill_rect(s1 + 1, y + 5, 3, 1, 1);
     oled_fill_rect(s1 + 4, y + 6, 1, 4, 1);
     oled_fill_rect(s1 + 0, y + 10, 4, 1, 1);
 
-    // 2. A (กว้าง 5, สูง 11) -> X: 12 (Gap = 3px)
-    int16_t ax = 12;
+    // A
+    int16_t ax = x + 8;
     oled_fill_rect(ax + 1, y + 0, 3, 1, 1);
     oled_fill_rect(ax + 0, y + 1, 1, 10, 1);
     oled_fill_rect(ax + 4, y + 1, 1, 10, 1);
     oled_fill_rect(ax + 1, y + 5, 3, 1, 1);
 
-    // 3. M (กว้าง 7, สูง 11) -> X: 20 (Gap = 3px)
-    int16_t mx = 20;
+    // M
+    int16_t mx = x + 16;
     oled_fill_rect(mx + 0, y + 0, 1, 11, 1);
     oled_fill_rect(mx + 6, y + 0, 1, 11, 1);
     oled_draw_pixel(mx + 1, y + 1, 1);
@@ -305,22 +293,22 @@ void oled_draw_samsung_56px(int16_t x, int16_t y) {
     oled_draw_pixel(mx + 4, y + 2, 1);
     oled_draw_pixel(mx + 5, y + 1, 1);
 
-    // 4. S (กว้าง 5, สูง 11) -> X: 30 (Gap = 3px)
-    int16_t s2 = 30;
+    // S
+    int16_t s2 = x + 26;
     oled_fill_rect(s2 + 1, y + 0, 4, 1, 1);
     oled_fill_rect(s2 + 0, y + 1, 1, 4, 1);
     oled_fill_rect(s2 + 1, y + 5, 3, 1, 1);
     oled_fill_rect(s2 + 4, y + 6, 1, 4, 1);
     oled_fill_rect(s2 + 0, y + 10, 4, 1, 1);
 
-    // 5. U (กว้าง 5, สูง 11) -> X: 38 (Gap = 3px)
-    int16_t ux = 38;
+    // U
+    int16_t ux = x + 34;
     oled_fill_rect(ux + 0, y + 0, 1, 10, 1);
     oled_fill_rect(ux + 4, y + 0, 1, 10, 1);
     oled_fill_rect(ux + 1, y + 10, 3, 1, 1);
 
-    // 6. N (กว้าง 6, สูง 11) -> X: 46 (Gap = 3px)
-    int16_t nx = 46;
+    // N
+    int16_t nx = x + 42;
     oled_fill_rect(nx + 0, y + 0, 1, 11, 1);
     oled_fill_rect(nx + 5, y + 0, 1, 11, 1);
     oled_draw_pixel(nx + 1, y + 2, 1);
@@ -328,8 +316,8 @@ void oled_draw_samsung_56px(int16_t x, int16_t y) {
     oled_draw_pixel(nx + 3, y + 6, 1);
     oled_draw_pixel(nx + 4, y + 8, 1);
 
-    // 7. G (กว้าง 6, สูง 11) -> X: 54 (Gap = 2px)
-    int16_t gx = 54;
+    // G
+    int16_t gx = x + 50;
     oled_fill_rect(gx + 1, y + 0, 4, 1, 1);
     oled_fill_rect(gx + 0, y + 1, 1, 9, 1);
     oled_fill_rect(gx + 1, y + 10, 4, 1, 1);
@@ -337,48 +325,70 @@ void oled_draw_samsung_56px(int16_t x, int16_t y) {
     oled_fill_rect(gx + 2, y + 5, 3, 1, 1);
 }
 
-// เรนเดอร์หน้าจอรีโมทแนวตั้ง: แสดง Header ด้านบน + ตัวเลขขนาดใหญ่ตรงกลาง
-void oled_render_remote_screen(const char *header, uint8_t num) {
+// ตาราง 3 คอลัมน์ x 4 แถว (12 ปุ่มควบคุม)
+static const uint8_t grid_key_map[4][3] = {
+    { 1,  2,  3 },
+    { 5,  6,  7 },
+    { 9, 10, 11 },
+    { 13, 14, 15 }
+};
+
+// เรนเดอร์หน้าจอ 3 ส่วน: บน (Header) / กลาง (ตาราง 3x4) / ล่าง (Footer)
+void oled_render_grid_screen(const char *header, const char *footer, uint8_t active_key, uint8_t blink_state) {
     oled_clear_buffer();
 
-    // 1. วาด Header SAMSUNG ขนาด 56px พอดีจอ
-    oled_draw_samsung_56px(5, 5);
+    // 1. [ส่วนบน] วาด Header SAMSUNG
+    oled_draw_samsung_56px(4, 4);
+    oled_fill_rect(2, 18, 60, 1, 1); // เส้นคั่นบน
 
-    // เส้นคั่นใต้ Header
-    oled_fill_rect(4, 19, 56, 1, 1);
+    // 2. [ส่วนกลาง] วาดตาราง 3x4 (12 ช่อง)
+    for (uint8_t r = 0; r < 4; r++) {
+        for (uint8_t c = 0; c < 3; c++) {
+            uint8_t key_num = grid_key_map[r][c];
 
-    // 2. วาดตัวเลขขนาดใหญ่ตรงกลาง (Y: 28 - 90)
-    if (num == 0) {
-        // แถบขีดกลางตอนสแตนด์บาย
-        oled_fill_rect(20, 56, 24, 4, 1);
-    } else if (num < 10) {
-        // ตัวเลขหลักเดียวขนาดใหญ่ (กว้าง 34, สูง 60)
-        int16_t w = 34;
-        int16_t h = 60;
-        int16_t t = 5;
-        int16_t x = (64 - w) / 2;
-        int16_t y = 28;
-        oled_draw_digit(x, y, w, h, t, num);
-    } else {
-        // ตัวเลข 2 หลัก (10 - 16) เคียงกัน
-        int16_t w = 22;
-        int16_t h = 52;
-        int16_t t = 4;
-        int16_t gap = 4;
-        int16_t total_w = (w * 2) + gap;
-        int16_t x1 = (64 - total_w) / 2;
-        int16_t x2 = x1 + w + gap;
-        int16_t y = 32;
+            int16_t bx = 3 + c * (17 + 3);  // X: 3, 23, 43
+            int16_t by = 21 + r * (17 + 3); // Y: 21, 41, 61, 81
+            int16_t bw = 17;
+            int16_t bh = 17;
 
-        oled_draw_digit(x1, y, w, h, t, num / 10);
-        oled_draw_digit(x2, y, w, h, t, num % 10);
+            // ตรวจสอบว่าช่องนี้กำลังถูกกด/กระพริบหรือไม่
+            uint8_t is_highlight = (key_num == active_key && blink_state);
+
+            if (is_highlight) {
+                // ช่องไฮไลต์: กล่องสีขาวทึบ ตัวเลขสีดำ
+                oled_fill_rect(bx, by, bw, bh, 1);
+            } else {
+                // ช่องปกติ: ตีกรอบสีขาว ตัวเลขสีขาว
+                oled_draw_rect(bx, by, bw, bh, 1);
+            }
+
+            // วาดตัวเลขข้างในกล่อง (จัดกึ่งกลาง)
+            char num_str[4];
+            if (key_num < 10) {
+                num_str[0] = '0' + key_num;
+                num_str[1] = '\0';
+                oled_draw_char(bx + 6, by + 5, num_str[0], is_highlight ? 0 : 1);
+            } else {
+                num_str[0] = '0' + (key_num / 10);
+                num_str[1] = '0' + (key_num % 10);
+                num_str[2] = '\0';
+                oled_draw_char(bx + 3, by + 5, num_str[0], is_highlight ? 0 : 1);
+                oled_draw_char(bx + 9, by + 5, num_str[1], is_highlight ? 0 : 1);
+            }
+        }
     }
 
-    // 3. เส้นคั่นและข้อความด้านล่าง
-    oled_fill_rect(4, 98, 56, 1, 1);
-    oled_draw_str(14, 108, "REMOTE");
+    // 3. [ส่วนล่าง] เส้นคั่นล่าง และ Footer
+    oled_fill_rect(2, 103, 60, 1, 1);
 
-    // ยิงขึ้นจอ
+    if (footer) {
+        int len = strlen(footer);
+        int16_t fx = (64 - (len * 6)) / 2;
+        if (fx < 2) fx = 2;
+        oled_draw_str(fx, 111, footer, 1);
+    }
+
+    // ส่งภาพขึ้นจอ
     oled_update();
 }
 

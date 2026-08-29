@@ -18,9 +18,12 @@ void ssd1306_clear(void);
 void oled_clear_buffer(void);
 void oled_draw_pixel(int16_t x, int16_t y, uint8_t color);
 void oled_fill_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t color);
-void oled_draw_char(int16_t x, int16_t y, char c);
-void oled_draw_str(int16_t x, int16_t y, const char *str);
-void oled_draw_digit(int16_t x, int16_t y, int16_t w, int16_t h, int16_t t, uint8_t digit);
+void oled_draw_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t color);
+void oled_draw_char(int16_t x, int16_t y, char c, uint8_t color);
+void oled_draw_str(int16_t x, int16_t y, const char *str, uint8_t color);
 void oled_draw_samsung_56px(int16_t x, int16_t y);
-void oled_render_remote_screen(const char *header, uint8_t num);
+
+// ฟังก์ชันเรนเดอร์หน้าจอ 3 ส่วน: บน (Header) / กลาง (ตาราง 3x4) / ล่าง (Footer)
+void oled_render_grid_screen(const char *header, const char *footer, uint8_t active_key, uint8_t blink_state);
+
 void oled_update(void);

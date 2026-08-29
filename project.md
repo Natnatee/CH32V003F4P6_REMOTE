@@ -91,12 +91,14 @@ pio run -t upload
 ## Current State
 - โครงสร้างหน้าจอ UI 3 ส่วน พร้อมตาราง 3x4 (12 ช่องปุ่ม) และ Header ตัวใหญ่สมบูรณ์
 - ระบบ 16 Profiles แบรนด์ และ 3 โหมด (SEND / LEARN / NEW) พร้อมระบบสลับโหมดด้วยปุ่ม 16 (BACK)
-- ระบบ IR Receiver บนขา `PD0` พร้อมฟังก์ชันถอดรหัส NEC / Samsung 32-bit
-- หน้าจอโหมด LEARN: แสดงรหัส HEX ที่อ่านได้ (`0xXXXXXXXX`) และบันทึกรหัสลงปุ่มตาราง 3x4 พร้อมถมสีขาวปุ่มที่จำแล้ว
+- **ระบบ Flash Storage (NVM @ 0x08003C00):** บันทึกค่า 16 Profiles ลง Flash ROM อัตโนมัติเมื่อกดบันทึกในโหมด LEARN (ปิดเครื่องแล้วค่าไม่หาย)
+- **RAM Optimization:** ถือเฉพาะ Active Profile ปัจจุบันใน RAM (12 ปุ่ม x 4B = 48 ไบต์) ลดการใช้ RAM ลงมหาศาล
+- **ระบบ IR Transmitter (PD4):** ยิงคลื่นพาหะ 38kHz PWM ส่งชุดรหัส 32-bit (NEC / Samsung) ในโหมด SEND ทันทีเมื่อกดปุ่มที่มีรหัส
+- **ระบบ IR Receiver (PD0):** รับสัญญาณและถอดรหัส 32-bit จากรีโมทจริงในโหมด LEARN
 
 ## Open Questions
-- การพัฒนาส่วน IR Transmitter (PWM 38kHz บนขา `PD4`) สำหรับโหมด SEND และ NEW
-- การบันทึกข้อมูล 16 Profiles ลงหน่วยความจำ Flash ROM (Flash Non-Volatile Storage) เพื่อไม่ให้ค่าหายเมื่อปิดเครื่อง
+- การพัฒนาโหมด NEW (Auto Brute-Force Code Search) สำหรับกวาดฐานข้อมูลรหัสทีวี/แอร์
+
 
 
 ## Issue Log

@@ -325,6 +325,42 @@ void oled_draw_samsung_56px(int16_t x, int16_t y) {
     oled_fill_rect(gx + 2, y + 5, 3, 1, 1);
 }
 
+// วาดตัวอักษรขนาดใหญ่ สูง 11px เส้นโปร่ง (Single-pixel stroke)
+void oled_draw_char_large(int16_t x, int16_t y, char c) {
+    if (c < 32 || c > 126) c = ' ';
+    uint8_t idx = c - 32;
+    for (uint8_t col = 0; col < 5; col++) {
+        uint8_t line = font6x8[idx][col];
+        for (uint8_t row = 0; row < 11; row++) {
+            uint8_t src_y = (row * 8) / 11;
+            if (line & (1U << src_y)) {
+                oled_draw_pixel(x + col, y + row, 1);
+            }
+        }
+    }
+}
+
+// วาดข้อความ Header ด้านบน ตัวใหญ่ สูง 11px จัดกึ่งกลางและเว้นระยะอัตโนมัติ
+void oled_draw_header_title(int16_t y, const char *str) {
+    int len = strlen(str);
+    if (len == 0) return;
+
+    int char_w = 5;
+    int gap = 3;
+    if (len <= 2) gap = 6;
+    else if (len <= 4) gap = 4;
+    else if (len <= 6) gap = 3;
+    else gap = 2; // คำยาวอย่าง SAMSUNG กว้าง 53px พอดีจอ 64px
+
+    int total_w = (len * char_w) + ((len - 1) * gap);
+    int16_t start_x = (64 - total_w) / 2;
+    if (start_x < 2) start_x = 2;
+
+    for (int i = 0; i < len; i++) {
+        oled_draw_char_large(start_x + i * (char_w + gap), y, str[i]);
+    }
+}
+
 // ตาราง 3 คอลัมน์ x 4 แถว (12 ปุ่มควบคุม)
 static const uint8_t grid_key_map[4][3] = {
     { 1,  2,  3 },
@@ -333,15 +369,17 @@ static const uint8_t grid_key_map[4][3] = {
     { 13, 14, 15 }
 };
 
-// เรนเดอร์หน้าจอ 3 ส่วน: บน (Header) / กลาง (ตาราง 3x4) / ล่าง (Footer)
+// เรนเดอร์หน้าจอ 3 ส่วน: บน (Header ชื่อโปรไฟล์ตัวใหญ่) / กลาง (ตาราง 3x4) / ล่าง (Footer สถานะโหมด)
 void oled_render_grid_screen(const char *header, const char *footer, uint8_t active_key, uint8_t blink_state) {
     oled_clear_buffer();
 
-    // 1. [ส่วนบน] วาด Header SAMSUNG
-    oled_draw_samsung_56px(4, 4);
+    // 1. [ส่วนบน] วาด Header ตัวใหญ่ สูง 11px (จัดกึ่งกลางและเว้นระยะสวยงาม)
+    if (header) {
+        oled_draw_header_title(4, header);
+    }
     oled_fill_rect(2, 18, 60, 1, 1); // เส้นคั่นบน
 
-    // 2. [ส่วนกลาง] วาดตาราง 3x4 (12 ช่อง)
+    // 2. [ส่วนกลาง] วาดตาราง 3x4 (12 ช่องปุ่ม)
     for (uint8_t r = 0; r < 4; r++) {
         for (uint8_t c = 0; c < 3; c++) {
             uint8_t key_num = grid_key_map[r][c];

@@ -251,7 +251,6 @@ void oled_draw_char(int16_t x, int16_t y, char c, uint8_t color) {
             if (line & (1U << row)) {
                 oled_draw_pixel(x + col, y + row, color);
             } else if (!color) {
-                // If drawing inverted (color=0), draw background as white
                 oled_draw_pixel(x + col, y + row, 1);
             }
         }
@@ -263,66 +262,6 @@ void oled_draw_str(int16_t x, int16_t y, const char *str, uint8_t color) {
         oled_draw_char(x, y, *str++, color);
         x += 6;
     }
-}
-
-// วาดตัวอักษร SAMSUNG รวมกว้าง 56px พร้อมเว้นระยะห่างระหว่างตัวอักษร (Letter Spacing 3px)
-void oled_draw_samsung_56px(int16_t x, int16_t y) {
-    // S
-    int16_t s1 = x;
-    oled_fill_rect(s1 + 1, y + 0, 4, 1, 1);
-    oled_fill_rect(s1 + 0, y + 1, 1, 4, 1);
-    oled_fill_rect(s1 + 1, y + 5, 3, 1, 1);
-    oled_fill_rect(s1 + 4, y + 6, 1, 4, 1);
-    oled_fill_rect(s1 + 0, y + 10, 4, 1, 1);
-
-    // A
-    int16_t ax = x + 8;
-    oled_fill_rect(ax + 1, y + 0, 3, 1, 1);
-    oled_fill_rect(ax + 0, y + 1, 1, 10, 1);
-    oled_fill_rect(ax + 4, y + 1, 1, 10, 1);
-    oled_fill_rect(ax + 1, y + 5, 3, 1, 1);
-
-    // M
-    int16_t mx = x + 16;
-    oled_fill_rect(mx + 0, y + 0, 1, 11, 1);
-    oled_fill_rect(mx + 6, y + 0, 1, 11, 1);
-    oled_draw_pixel(mx + 1, y + 1, 1);
-    oled_draw_pixel(mx + 2, y + 2, 1);
-    oled_draw_pixel(mx + 3, y + 3, 1);
-    oled_draw_pixel(mx + 3, y + 4, 1);
-    oled_draw_pixel(mx + 4, y + 2, 1);
-    oled_draw_pixel(mx + 5, y + 1, 1);
-
-    // S
-    int16_t s2 = x + 26;
-    oled_fill_rect(s2 + 1, y + 0, 4, 1, 1);
-    oled_fill_rect(s2 + 0, y + 1, 1, 4, 1);
-    oled_fill_rect(s2 + 1, y + 5, 3, 1, 1);
-    oled_fill_rect(s2 + 4, y + 6, 1, 4, 1);
-    oled_fill_rect(s2 + 0, y + 10, 4, 1, 1);
-
-    // U
-    int16_t ux = x + 34;
-    oled_fill_rect(ux + 0, y + 0, 1, 10, 1);
-    oled_fill_rect(ux + 4, y + 0, 1, 10, 1);
-    oled_fill_rect(ux + 1, y + 10, 3, 1, 1);
-
-    // N
-    int16_t nx = x + 42;
-    oled_fill_rect(nx + 0, y + 0, 1, 11, 1);
-    oled_fill_rect(nx + 5, y + 0, 1, 11, 1);
-    oled_draw_pixel(nx + 1, y + 2, 1);
-    oled_draw_pixel(nx + 2, y + 4, 1);
-    oled_draw_pixel(nx + 3, y + 6, 1);
-    oled_draw_pixel(nx + 4, y + 8, 1);
-
-    // G
-    int16_t gx = x + 50;
-    oled_fill_rect(gx + 1, y + 0, 4, 1, 1);
-    oled_fill_rect(gx + 0, y + 1, 1, 9, 1);
-    oled_fill_rect(gx + 1, y + 10, 4, 1, 1);
-    oled_fill_rect(gx + 5, y + 5, 1, 5, 1);
-    oled_fill_rect(gx + 2, y + 5, 3, 1, 1);
 }
 
 // วาดตัวอักษรขนาดใหญ่ สูง 11px เส้นโปร่ง (Single-pixel stroke)
@@ -350,7 +289,7 @@ void oled_draw_header_title(int16_t y, const char *str) {
     if (len <= 2) gap = 6;
     else if (len <= 4) gap = 4;
     else if (len <= 6) gap = 3;
-    else gap = 2; // คำยาวอย่าง SAMSUNG กว้าง 53px พอดีจอ 64px
+    else gap = 2;
 
     int total_w = (len * char_w) + ((len - 1) * gap);
     int16_t start_x = (64 - total_w) / 2;
@@ -361,6 +300,17 @@ void oled_draw_header_title(int16_t y, const char *str) {
     }
 }
 
+// แปลงตัวเลข 32-bit เป็น Hex String เช่น "0x20DF10EF"
+void hex_to_str(uint32_t val, char *out) {
+    static const char hex_digits[] = "0123456789ABCDEF";
+    out[0] = '0';
+    out[1] = 'x';
+    for (int i = 7; i >= 0; i--) {
+        out[2 + (7 - i)] = hex_digits[(val >> (i * 4)) & 0xF];
+    }
+    out[10] = '\0';
+}
+
 // ตาราง 3 คอลัมน์ x 4 แถว (12 ปุ่มควบคุม)
 static const uint8_t grid_key_map[4][3] = {
     { 1,  2,  3 },
@@ -369,11 +319,11 @@ static const uint8_t grid_key_map[4][3] = {
     { 13, 14, 15 }
 };
 
-// เรนเดอร์หน้าจอ 3 ส่วน: บน (Header ชื่อโปรไฟล์ตัวใหญ่) / กลาง (ตาราง 3x4) / ล่าง (Footer สถานะโหมด)
-void oled_render_grid_screen(const char *header, const char *footer, uint8_t active_key, uint8_t blink_state) {
+// เรนเดอร์หน้าจอ 3 ส่วน: บน (Header) / กลาง (ตาราง 3x4 พร้อมสถานะช่องจำ/ว่าง) / ล่าง (Footer)
+void oled_render_grid_screen(const char *header, const char *footer, uint8_t active_key, uint8_t blink_state, const uint32_t *profile_codes) {
     oled_clear_buffer();
 
-    // 1. [ส่วนบน] วาด Header ตัวใหญ่ สูง 11px (จัดกึ่งกลางและเว้นระยะสวยงาม)
+    // 1. [ส่วนบน] วาด Header ตัวใหญ่ สูง 11px
     if (header) {
         oled_draw_header_title(4, header);
     }
@@ -383,20 +333,33 @@ void oled_render_grid_screen(const char *header, const char *footer, uint8_t act
     for (uint8_t r = 0; r < 4; r++) {
         for (uint8_t c = 0; c < 3; c++) {
             uint8_t key_num = grid_key_map[r][c];
+            uint8_t cell_idx = r * 3 + c;
 
             int16_t bx = 3 + c * (17 + 3);  // X: 3, 23, 43
             int16_t by = 21 + r * (17 + 3); // Y: 21, 41, 61, 81
             int16_t bw = 17;
             int16_t bh = 17;
 
-            // ตรวจสอบว่าช่องนี้กำลังถูกกด/กระพริบหรือไม่
-            uint8_t is_highlight = (key_num == active_key && blink_state);
+            // ตรวจสอบว่าช่องนี้มีโค้ดแล้วหรือยัง
+            uint8_t has_code = (profile_codes != NULL && profile_codes[cell_idx] != 0);
 
-            if (is_highlight) {
-                // ช่องไฮไลต์: กล่องสีขาวทึบ ตัวเลขสีดำ
+            // ตรวจสอบสถานะการกด / กระพริบ
+            uint8_t is_active = (key_num == active_key);
+            uint8_t show_filled;
+
+            if (is_active) {
+                // ถ้ากำลังกดปุ่มนี้อยู่ ให้สลับสถานะไปมาเพื่อกระพริบ
+                show_filled = blink_state ? (!has_code) : has_code;
+            } else {
+                // สถานะปกติ: ช่องที่จำแล้ว = พื้นขาวตัวเลขอักษรดำ (show_filled=1), ช่องว่าง = กรอบขาวตัวเลขขาว (show_filled=0)
+                show_filled = has_code;
+            }
+
+            if (show_filled) {
+                // ช่องมีโค้ด (หรือไฮไลต์): กล่องสีขาวทึบ ตัวเลขสีดำ
                 oled_fill_rect(bx, by, bw, bh, 1);
             } else {
-                // ช่องปกติ: ตีกรอบสีขาว ตัวเลขสีขาว
+                // ช่องว่าง: ตีกรอบสีขาว ตัวเลขสีขาว
                 oled_draw_rect(bx, by, bw, bh, 1);
             }
 
@@ -405,13 +368,13 @@ void oled_render_grid_screen(const char *header, const char *footer, uint8_t act
             if (key_num < 10) {
                 num_str[0] = '0' + key_num;
                 num_str[1] = '\0';
-                oled_draw_char(bx + 6, by + 5, num_str[0], is_highlight ? 0 : 1);
+                oled_draw_char(bx + 6, by + 5, num_str[0], show_filled ? 0 : 1);
             } else {
                 num_str[0] = '0' + (key_num / 10);
                 num_str[1] = '0' + (key_num % 10);
                 num_str[2] = '\0';
-                oled_draw_char(bx + 3, by + 5, num_str[0], is_highlight ? 0 : 1);
-                oled_draw_char(bx + 9, by + 5, num_str[1], is_highlight ? 0 : 1);
+                oled_draw_char(bx + 3, by + 5, num_str[0], show_filled ? 0 : 1);
+                oled_draw_char(bx + 9, by + 5, num_str[1], show_filled ? 0 : 1);
             }
         }
     }
@@ -427,6 +390,35 @@ void oled_render_grid_screen(const char *header, const char *footer, uint8_t act
     }
 
     // ส่งภาพขึ้นจอ
+    oled_update();
+}
+
+// เรนเดอร์หน้าจอเมื่อรับรหัส IR ได้ในโหมด LEARN
+void oled_render_ir_captured_screen(const char *header, uint32_t ir_code) {
+    oled_clear_buffer();
+
+    // 1. [ส่วนบน] Header แบรนด์ตัวใหญ่
+    if (header) {
+        oled_draw_header_title(4, header);
+    }
+    oled_fill_rect(2, 18, 60, 1, 1); // เส้นคั่นบน
+
+    // 2. [ส่วนกลาง] แสดงรหัส IR ที่อ่านได้ขนาดใหญ่ชัดเจน
+    oled_draw_str(8, 25, "IR READ:", 1);
+
+    // กรอบโชว์รหัส HEX (X: 1, Y: 38, W: 62, H: 18)
+    oled_draw_rect(1, 38, 62, 18, 1);
+    char hex_buf[12];
+    hex_to_str(ir_code, hex_buf); // e.g. "0x20DF10EF"
+    oled_draw_str(2, 43, hex_buf, 1);
+
+    oled_draw_str(2, 68, "PRESS 1-15", 1);
+    oled_draw_str(11, 82, "TO SAVE", 1);
+
+    // 3. [ส่วนล่าง] Footer
+    oled_fill_rect(2, 103, 60, 1, 1);
+    oled_draw_str(5, 111, "16:CANCEL", 1);
+
     oled_update();
 }
 

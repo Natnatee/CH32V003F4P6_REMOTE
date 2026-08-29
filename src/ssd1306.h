@@ -24,7 +24,13 @@ void oled_draw_str(int16_t x, int16_t y, const char *str, uint8_t color);
 void oled_draw_char_large(int16_t x, int16_t y, char c);
 void oled_draw_header_title(int16_t y, const char *str);
 
-// ฟังก์ชันเรนเดอร์หน้าจอ 3 ส่วน: บน (Header) / กลาง (ตาราง 3x4) / ล่าง (Footer)
-void oled_render_grid_screen(const char *header, const char *footer, uint8_t active_key, uint8_t blink_state);
+// แปลงตัวเลข 32-bit เป็น Hex String (เช่น 0x20DF10EF)
+void hex_to_str(uint32_t val, char *out);
+
+// ฟังก์ชันเรนเดอร์หน้าจอ 3 ส่วน: บน (Header) / กลาง (ตาราง 3x4 พร้อมสถานะช่องจำ/ว่าง) / ล่าง (Footer)
+void oled_render_grid_screen(const char *header, const char *footer, uint8_t active_key, uint8_t blink_state, const uint32_t *profile_codes);
+
+// ฟังก์ชันเรนเดอร์หน้าจอเมื่อรับรหัส IR ได้ในโหมด LEARN
+void oled_render_ir_captured_screen(const char *header, uint32_t ir_code);
 
 void oled_update(void);

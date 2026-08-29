@@ -49,12 +49,19 @@
 | **VCC** | **`V (3.3V)`** | ไฟเลี้ยงจอ 3.3V |
 | **GND** | **`G (GND)`** | กราวด์ |
 
-### 3. โปรแกรมเมอร์ WCH-LinkE
+### 3. ตารางการต่อระบบอินฟราเรด (IR Module)
+| อุปกรณ์ IR | ขาบอร์ด CH32V003 | โหมดการทำงาน | คำอธิบาย |
+|---|---|---|---|
+| **IR TX (หลอดส่ง IR)** | **`PD4`** | Output (TIM2 PWM / Bit-Bang) | ยิงสัญญาณ IR 38kHz |
+| **IR RX (ตัวรับ VS1838B)** | **`PD0`** | Input (EXTI / Polling) | รับสัญญาณ IR 38kHz |
+
+### 4. โปรแกรมเมอร์ WCH-LinkE
 | ขา WCH-LinkE | พินบน CH32V003 | คำอธิบาย |
 |---|---|---|
 | **3.3V** | **`V (3.3V)`** | ไฟเลี้ยงระบบ |
 | **GND** | **`G (GND)`** | กราวด์ร่วม |
 | **SWDIO** | **`PD1 (SWIO)`** | ขาแฟลชและ SDI Debug Monitor |
+
 
 
 ## Electrical / Safety Notes
@@ -82,11 +89,15 @@ pio run -t upload
 ```
 
 ## Current State
-- โครงสร้างโปรเจกต์ตั้งต้นเสร็จสมบูรณ์
-- เฟิร์มแวร์ทดสอบ Blink LED + SDI Debug Printf พร้อมใช้งาน
+- โครงสร้างหน้าจอ UI 3 ส่วน พร้อมตาราง 3x4 (12 ช่องปุ่ม) และ Header ตัวใหญ่สมบูรณ์
+- ระบบ 16 Profiles แบรนด์ และ 3 โหมด (SEND / LEARN / NEW) พร้อมระบบสลับโหมดด้วยปุ่ม 16 (BACK)
+- ระบบ IR Receiver บนขา `PD0` พร้อมฟังก์ชันถอดรหัส NEC / Samsung 32-bit
+- หน้าจอโหมด LEARN: แสดงรหัส HEX ที่อ่านได้ (`0xXXXXXXXX`) และบันทึกรหัสลงปุ่มตาราง 3x4 พร้อมถมสีขาวปุ่มที่จำแล้ว
 
 ## Open Questions
-- การกำหนดขาและโมดูลเพิ่มเติมสำหรับงาน Remote (เช่น RF 433MHz, NRF24L01, IR, หรือปุ่ม Matrix)
+- การพัฒนาส่วน IR Transmitter (PWM 38kHz บนขา `PD4`) สำหรับโหมด SEND และ NEW
+- การบันทึกข้อมูล 16 Profiles ลงหน่วยความจำ Flash ROM (Flash Non-Volatile Storage) เพื่อไม่ให้ค่าหายเมื่อปิดเครื่อง
+
 
 ## Issue Log
 - **WLink Open Error**: เกิดจาก PlatformIO ค่าเริ่มต้นใช้ OpenOCD/WLink Driver ซึ่งไม่ตรงกับ WinUSB ของระบบ แก้ไขโดยกำหนด `upload_protocol = minichlink` ใน `platformio.ini`

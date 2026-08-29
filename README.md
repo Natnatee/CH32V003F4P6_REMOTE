@@ -17,8 +17,10 @@
 ## Hardware
 - **MCU**: WCH CH32V003F4P6 (32-bit RISC-V QingKe V2A @ 48MHz, 16KB Flash, 2KB SRAM)
 - **Package**: TSSOP-20
-- **Display**: 0.96" SSD1306 OLED (I2C)
-- **Keypad**: 4x4 Matrix Keypad (16 Buttons)
+- **Display**: 0.96" SSD1306 OLED (I2C: PC6=SCL, PC7=SDA)
+- **Keypad**: 4x4 Matrix Keypad (16 Buttons: RX..PC4)
+- **IR Receiver**: VS1838B 38kHz (Data: PD0)
+- **IR Transmitter**: 940nm IR LED (PWM/Bit-Bang: PD4)
 - **Programmer**: WCH-LinkE (โหมด RISC-V / WCH-LinkRV)
 
 ## Pin Map
@@ -32,11 +34,11 @@
             G (GND) | [ ]               [ ] | G (GND)
           V (3V3/5) | [ ]  [PWR] [LED]  [ ] | V (3V3/5)
        TX (PD5/UART)| [ ]      [RST]    [ ] | PD7 (NRST - ปุ่ม Reset)
- [K1]  RX (PD6/UART)| [ ]               [ ] | PD4
- [K2]           PA1 | [ ]  +---------+  [ ] | PD3
- [K3]           PA2 | [ ]  |  CH32   |  [ ] | PD2
- [K4]           PC0 | [ ]  | V003F4P6|  [ ] | PD1 (SWIO แฟลช)
- [K5]           PC1 | [ ]  +---------+  [ ] | PD0
+ [K4]  RX (PD6/UART)| [ ]               [ ] | PD4 (📡 IR TX / หลอด IR Send)
+ [K3]           PA1 | [ ]  +---------+  [ ] | PD3
+ [K2]           PA2 | [ ]  |  CH32   |  [ ] | PD2
+ [K1]           PC0 | [ ]  | V003F4P6|  [ ] | PD1 (SWIO แฟลช)
+ [K5]           PC1 | [ ]  +---------+  [ ] | PD0 (📥 IR RX / ตัวรับ VS1838)
  [K6]           PC2 | [ ]               [ ] | PC7 (OLED SDA)
  [K7]           PC3 | [ ]               [ ] | PC6 (OLED SCL)
  [K8]           PC4 | [ ]               [ ] | PC5
@@ -56,19 +58,26 @@
 | **Pin 8 (K8)** | **`PC4`** | Input Pull-Up | Col 4 (หลัก 4) |
 
 ### 3. ตารางการต่อจอ OLED SSD1306 (I2C)
-| ขา OLED | ขาบอร์ด CH32V003 |
-|---|---|
-| **SCL** | **`PC6`** |
-| **SDA** | **`PC7`** |
-| **VCC** | **`V (3.3V)`** |
-| **GND** | **`G (GND)`** |
+| ขา OLED | ขาบอร์ด CH32V003 | คำอธิบาย |
+|---|---|---|
+| **SCL** | **`PC6`** | I2C Clock |
+| **SDA** | **`PC7`** | I2C Data |
+| **VCC** | **`V (3.3V)`** | ไฟเลี้ยง 3.3V |
+| **GND** | **`G (GND)`** | กราวด์ |
 
-### 4. การต่อสายโปรแกรมเมอร์ WCH-LinkE (3 สาย)
+### 4. ตารางการต่อระบบอินฟราเรด (IR Module)
+| อุปกรณ์ IR | ขาบอร์ด CH32V003 | คำแนะนำการต่อวงจร |
+|---|---|---|
+| **IR TX (หลอดส่ง IR)** | **`PD4`** | ต่อผ่านตัวต้านทาน 100Ω - 220Ω เข้าขา Anode (+), ขา Cathode ต่อลง GND |
+| **IR RX (ตัวรับ VS1838B)** | **`PD0` (OUT), `V` (VCC), `G` (GND)** | หันตุ่มนูนเข้าหาตัว: ขาซ้าย=PD0, ขากลาง=GND, ขาขวา=3.3V |
+
+### 5. การต่อสายโปรแกรมเมอร์ WCH-LinkE (3 สาย)
 | ขา WCH-LinkE | ขาบอร์ด CH32V003 |
 |---|---|
 | **3.3V** | **`V (3.3V)`** |
 | **GND** | **`G (GND)`** |
 | **SWDIO** | **`PD1 (SWIO)`** |
+
 
 
 ## Getting Started

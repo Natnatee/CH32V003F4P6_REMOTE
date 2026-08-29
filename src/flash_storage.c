@@ -1,4 +1,5 @@
 #include "flash_storage.h"
+#include "ir_database.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -11,7 +12,7 @@ void flash_storage_init(void) {
 }
 
 void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes) {
-    if (profile_idx >= 16 || !active_codes) return;
+    if (profile_idx >= TOTAL_PROFILES_COUNT || !active_codes) return;
 
     uint32_t page_addr = FLASH_PROFILE_BASE_ADDR + (profile_idx * FLASH_PROFILE_PAGE_SIZE);
     const uint32_t *ptr = (const uint32_t *)page_addr;
@@ -22,15 +23,15 @@ void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes) {
             active_codes[i] = ptr[i];
         }
     } else {
-        // ถ้ายังไม่เคยบันทึก ให้เคลียร์ค่าว่าง (0) ทั้งหมด
+        // ถ้ายังไม่เคยบันทึก ให้ดึงค่าจาก Factory Default Presets
         for (int i = 0; i < 12; i++) {
-            active_codes[i] = 0;
+            active_codes[i] = default_presets[profile_idx][i];
         }
     }
 }
 
 void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes) {
-    if (profile_idx >= 16 || !active_codes) return;
+    if (profile_idx >= TOTAL_PROFILES_COUNT || !active_codes) return;
 
     uint32_t page_addr = FLASH_PROFILE_BASE_ADDR + (profile_idx * FLASH_PROFILE_PAGE_SIZE);
     volatile uint32_t *ptr = (volatile uint32_t *)page_addr;

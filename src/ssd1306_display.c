@@ -422,6 +422,50 @@ void oled_render_ir_captured_screen(const char *header, uint32_t ir_code) {
     oled_update();
 }
 
+// เรนเดอร์หน้าจอเมื่อกวาดยิงรหัสในโหมด NEW (แสดงลำดับ รหัส และวิธีเซฟ)
+void oled_render_new_code_screen(const char *header, uint32_t code, uint16_t cur_idx, uint16_t total_count) {
+    oled_clear_buffer();
+
+    // 1. [ส่วนบน] Header แบรนด์ตัวใหญ่
+    if (header) {
+        oled_draw_header_title(4, header);
+    }
+    oled_fill_rect(2, 18, 60, 1, 1); // เส้นคั่นบน
+
+    // 2. [ส่วนกลาง] แสดงสถานะการกวาดยิง
+    oled_draw_str(8, 23, "SENDING:", 1);
+
+    // แสดงลำดับ [ 001 / 256 ]
+    char idx_str[16];
+    uint16_t c = cur_idx + 1;
+    idx_str[0] = '[';
+    idx_str[1] = '0' + (c / 100);
+    idx_str[2] = '0' + ((c / 10) % 10);
+    idx_str[3] = '0' + (c % 10);
+    idx_str[4] = '/';
+    idx_str[5] = '0' + (total_count / 100);
+    idx_str[6] = '0' + ((total_count / 10) % 10);
+    idx_str[7] = '0' + (total_count % 10);
+    idx_str[8] = ']';
+    idx_str[9] = '\0';
+    oled_draw_str((64 - 9 * 6) / 2, 35, idx_str, 1);
+
+    // กรอบโชว์รหัส HEX (X: 1, Y: 48, W: 62, H: 17)
+    oled_draw_rect(1, 48, 62, 17, 1);
+    char hex_buf[12];
+    hex_to_str(code, hex_buf);
+    oled_draw_str(2, 53, hex_buf, 1);
+
+    oled_draw_str(2, 69, "PRESS 1-15", 1);
+    oled_draw_str(11, 83, "TO SAVE", 1);
+
+    // 3. [ส่วนล่าง] Footer
+    oled_fill_rect(2, 103, 60, 1, 1);
+    oled_draw_str(8, 111, "12:RETRY", 1);
+
+    oled_update();
+}
+
 void oled_update(void) {
     for (uint8_t page = 0; page < 8; page++) {
         ssd1306_write_cmd(0xB0 + page);

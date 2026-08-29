@@ -33,4 +33,7 @@ void oled_render_grid_screen(const char *header, const char *footer, uint8_t act
 // ฟังก์ชันเรนเดอร์หน้าจอเมื่อรับรหัส IR ได้ในโหมด LEARN
 void oled_render_ir_captured_screen(const char *header, uint32_t ir_code);
 
+// ฟังก์ชันเรนเดอร์หน้าจอเมื่อกวาดยิงรหัสในโหมด NEW (แสดงลำดับ รหัส และวิธีเซฟ)
+void oled_render_new_code_screen(const char *header, uint32_t code, uint16_t cur_idx, uint16_t total_count);
+
 void oled_update(void);

@@ -7,29 +7,33 @@
 #include "ir_send.h"
 #include "flash_storage.h"
 #include "ir_database.h"
+#include "tetris.h"
 
 void SetupDebugPrintf(void);
 
-// 4 โหมดการทำงาน
+// 5 โหมดการทำงาน (รวมโหมด TETRIS)
 typedef enum {
     MODE_SEND = 0,
     MODE_LEARN = 1,
     MODE_NEW = 2,
-    MODE_RENAME = 3
+    MODE_RENAME = 3,
+    MODE_TETRIS = 4
 } RemoteMode;
 
-static const char *mode_names[4] = {
+static const char *mode_names[5] = {
     "SEND",
     "LRN ",
     "NEW ",
-    "NAME"
+    "NAME",
+    "TETR"
 };
 
-static const char *mode_select_labels[4] = {
+static const char *mode_select_labels[5] = {
     "[ SEND ]",
     "[ LEARN ]",
     "[  NEW  ]",
-    "[ RENAME ]"
+    "[ RENAME ]",
+    "[ TETRIS ]"
 };
 
 // บัฟเฟอร์ใน RAM สำหรับถือเฉพาะโปรไฟล์ปัจจุบันที่กำลังใช้งาน (12 ปุ่ม = 48 ไบต์เท่านั้น!)
@@ -101,7 +105,7 @@ int main()
     Delay_Ms(200);
 
     printf("\r\n=========================================\r\n");
-    printf("   CH32V003 Smart Remote with RENAME\r\n");
+    printf("   CH32V003 Smart Remote with TETRIS\r\n");
     printf("   IR RX Pin : PD0 (VS1838B)\r\n");
     printf("   IR TX Pin : PD4 (38kHz PWM)\r\n");
     printf("   Flash NVM : 16 Profiles @ 0x08003C00\r\n");
@@ -148,6 +152,32 @@ int main()
 
     while (1)
     {
+        // --- 0. โหมดพิเศษ: TETRIS GAME ---
+        if (current_mode == MODE_TETRIS && !mode_select_active)
+        {
+            uint8_t key = keypad_scan(&row, &col);
+            uint8_t is_new = (key != 0 && key != last_key);
+            if (key != 0) {
+                last_key = key;
+                tetris_handle_key(key, is_new);
+            } else {
+                last_key = 0;
+                tetris_handle_key(0, 0);
+            }
+
+            if (tetris_should_exit()) {
+                current_mode = MODE_SEND;
+                get_footer_str(footer_buf, current_mode, current_profile);
+                oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+            } else {
+                tetris_update();
+                tetris_render();
+            }
+
+            Delay_Ms(20);
+            continue;
+        }
+
         // --- 1. ตรวจจับสัญญาณ IR ในโหมด LEARN ---
         if (current_mode == MODE_LEARN && !mode_select_active && !ir_captured)
         {
@@ -340,7 +370,6 @@ int main()
                     else if (key == 12)
                     {
                         // ปุ่ม 12: OK บันทึกชื่อลง Flash ROM ถาวร!
-                        // ตัดช่องว่างส่วนท้ายออก
                         for (int i = 6; i >= 0; i--) {
                             if (edit_name_buf[i] == ' ') edit_name_buf[i] = '\0';
                             else break;
@@ -372,7 +401,6 @@ int main()
                             const char *letters = key_letters[idx];
                             int let_len = strlen(letters);
 
-                            // หาตัวอักษรปัจจุบันในกลุ่ม
                             char cur_c = edit_name_buf[rename_cursor];
                             int found_pos = -1;
                             for (int i = 0; i < let_len; i++) {
@@ -382,7 +410,6 @@ int main()
                                 }
                             }
 
-                            // วนไปตัวอักษรถัดไปในกลุ่ม
                             int next_pos = (found_pos + 1) % let_len;
                             edit_name_buf[rename_cursor] = letters[next_pos];
 
@@ -399,7 +426,7 @@ int main()
                 if (key == 4)
                 {
                     // ปุ่ม 4: UP
-                    selected_mode = (RemoteMode)((selected_mode + 3) % 4);
+                    selected_mode = (RemoteMode)((selected_mode + 4) % 5);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -407,7 +434,7 @@ int main()
                 else if (key == 8)
                 {
                     // ปุ่ม 8: DOWN
-                    selected_mode = (RemoteMode)((selected_mode + 1) % 4);
+                    selected_mode = (RemoteMode)((selected_mode + 1) % 5);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -421,7 +448,10 @@ int main()
                     new_brute_idx = 0;
                     rename_editing = 0;
 
-                    if (current_mode == MODE_RENAME) {
+                    if (current_mode == MODE_TETRIS) {
+                        tetris_init();
+                        tetris_render();
+                    } else if (current_mode == MODE_RENAME) {
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     } else {
                         get_footer_str(footer_buf, current_mode, current_profile);
@@ -547,7 +577,6 @@ int main()
             }
             else if (current_mode == MODE_RENAME && rename_editing)
             {
-                // กระพริบ Cursor ใต้ตัวอักษรที่กำลังแก้
                 oled_render_rename_screen(edit_name_buf, rename_cursor, mode_blink_state, current_profile, 1);
             }
         }

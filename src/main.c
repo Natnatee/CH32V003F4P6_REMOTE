@@ -8,33 +8,37 @@
 #include "ir_database.h"
 #include "tetris.h"
 #include "calc.h"
+#include "ina226.h"
 
-// 6 โหมดการทำงานหลัก (SEND, LEARN, NEW, RENAME, TETRIS, CALC)
+// 7 โหมดการทำงานหลัก (SEND, LEARN, NEW, RENAME, TETRIS, CALC, METER)
 typedef enum {
     MODE_SEND = 0,
     MODE_LEARN = 1,
     MODE_NEW = 2,
     MODE_RENAME = 3,
     MODE_TETRIS = 4,
-    MODE_CALC = 5
+    MODE_CALC = 5,
+    MODE_METER = 6
 } RemoteMode;
 
-static const char *mode_names[6] = {
+static const char *mode_names[7] = {
     "SEND",
     "LRN ",
     "NEW ",
     "NAME",
     "TETR",
-    "CALC"
+    "CALC",
+    "METR"
 };
 
-static const char *mode_select_labels[6] = {
+static const char *mode_select_labels[7] = {
     "[ SEND ]",
     "[ LEARN ]",
     "[  NEW  ]",
     "[ RENAME ]",
     "[ TETRIS ]",
-    "[  CALC  ]"
+    "[  CALC  ]",
+    "[ METER ]"
 };
 
 // บัฟเฟอร์ใน RAM สำหรับถือเฉพาะโปรไฟล์ปัจจุบันที่กำลังใช้งาน (12 ปุ่ม = 48 ไบต์เท่านั้น!)
@@ -192,6 +196,32 @@ int main()
             }
 
             Delay_Ms(20);
+            continue;
+        }
+
+        // --- 0.3 โหมดพิเศษ: MULTIMETER (INA226) ---
+        if (current_mode == MODE_METER && !mode_select_active)
+        {
+            uint8_t key = keypad_scan(&row, &col);
+            if (key != 0 && key != last_key) {
+                last_key = key;
+                ina226_handle_key(key);
+            } else if (key == 0) {
+                last_key = 0;
+            }
+
+            if (ina226_should_exit()) {
+                mode_select_active = 1;
+                selected_mode = current_mode;
+                mode_blink_state = 1;
+                blink_tick = 0;
+                oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
+            } else {
+                ina226_update();
+                ina226_render();
+            }
+
+            Delay_Ms(50);
             continue;
         }
 
@@ -432,7 +462,7 @@ int main()
                 if (key == 4)
                 {
                     // ปุ่ม 4: UP
-                    selected_mode = (RemoteMode)((selected_mode + 5) % 6);
+                    selected_mode = (RemoteMode)((selected_mode + 6) % 7);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -440,7 +470,7 @@ int main()
                 else if (key == 8)
                 {
                     // ปุ่ม 8: DOWN
-                    selected_mode = (RemoteMode)((selected_mode + 1) % 6);
+                    selected_mode = (RemoteMode)((selected_mode + 1) % 7);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -460,6 +490,9 @@ int main()
                     } else if (current_mode == MODE_CALC) {
                         calc_init();
                         calc_render();
+                    } else if (current_mode == MODE_METER) {
+                        ina226_init();
+                        ina226_render();
                     } else if (current_mode == MODE_RENAME) {
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     } else {
@@ -477,6 +510,8 @@ int main()
                         calc_render();
                     } else if (current_mode == MODE_TETRIS) {
                         tetris_render();
+                    } else if (current_mode == MODE_METER) {
+                        ina226_render();
                     } else {
                         get_footer_str(footer_buf, current_mode, current_profile);
                         oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);

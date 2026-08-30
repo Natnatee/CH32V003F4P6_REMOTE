@@ -305,10 +305,13 @@ void oled_render_grid_screen(const char *header, const char *footer, uint8_t act
                 case 11: key_num = 15; break;
             }
 
-            uint8_t is_pressed = (active_key == key_num && blink_state);
             uint8_t is_learned = (profile_codes && profile_codes[idx] != 0);
+            uint8_t is_solid = is_learned;
+            if (active_key == key_num && blink_state) {
+                is_solid = !is_solid;
+            }
 
-            if (is_pressed || is_learned) {
+            if (is_solid) {
                 oled_fill_rect(bx, by, bw, bh, 1);
                 const char *lbl = grid_labels[idx];
                 int lbl_len = strlen(lbl);

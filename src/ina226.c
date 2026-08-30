@@ -30,7 +30,7 @@ static int32_t avg_i_ua = 0;
 static const char *page_titles[3] = {
     "REAL TIME",
     "PEAK",
-    "AVG (5s)"
+    "AVG"
 };
 
 // --- Low-Level Bit-Bang I2C Functions (100kHz Standard Timing) ---

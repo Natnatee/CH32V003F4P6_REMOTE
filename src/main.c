@@ -157,9 +157,11 @@ int main()
             }
 
             if (tetris_should_exit()) {
-                current_mode = MODE_SEND;
-                get_footer_str(footer_buf, current_mode, current_profile);
-                oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+                mode_select_active = 1;
+                selected_mode = current_mode;
+                mode_blink_state = 1;
+                blink_tick = 0;
+                oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
             } else {
                 tetris_update();
                 tetris_render();
@@ -182,9 +184,11 @@ int main()
             }
 
             if (calc_should_exit()) {
-                current_mode = MODE_SEND;
-                get_footer_str(footer_buf, current_mode, current_profile);
-                oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
+                mode_select_active = 1;
+                selected_mode = current_mode;
+                mode_blink_state = 1;
+                blink_tick = 0;
+                oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
             }
 
             Delay_Ms(20);
@@ -471,6 +475,8 @@ int main()
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     } else if (current_mode == MODE_CALC) {
                         calc_render();
+                    } else if (current_mode == MODE_TETRIS) {
+                        tetris_render();
                     } else {
                         get_footer_str(footer_buf, current_mode, current_profile);
                         oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);

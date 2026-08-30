@@ -5,7 +5,7 @@
 
 #define FLASH_PROFILE_BASE_ADDR   0x08003C00
 #define FLASH_PROFILE_PAGE_SIZE   64
-#define FLASH_PROFILE_MAGIC       0xA55A0001
+#define FLASH_PROFILE_MAGIC       0xA55A0002
 
 // เริ่มต้น Flash Storage
 void flash_storage_init(void);

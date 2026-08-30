@@ -138,8 +138,8 @@ void ssd1306_init(void) {
     ssd1306_write_cmd(0x40);
     ssd1306_write_cmd(0x8D); ssd1306_write_cmd(0x14); // Enable Charge Pump
     ssd1306_write_cmd(0x20); ssd1306_write_cmd(0x02); // Page Addressing Mode
-    ssd1306_write_cmd(0xA1); // Segment Re-map
-    ssd1306_write_cmd(0xC8); // COM Output Scan Direction
+    ssd1306_write_cmd(0xA0); // Segment Re-map (0xA0 = Normal, 0xA1 = Remapped)
+    ssd1306_write_cmd(0xC0); // COM Output Scan Direction (0xC0 = Normal, 0xC8 = Remapped)
     ssd1306_write_cmd(0xDA); ssd1306_write_cmd(0x12);
     ssd1306_write_cmd(0x81); ssd1306_write_cmd(0xCF);
     ssd1306_write_cmd(0xD9); ssd1306_write_cmd(0xF1);

@@ -93,6 +93,14 @@ related:
 - [x] บันทึก protocol และจำนวนบิตของ Profile ใน reserved Flash word
 - [x] ให้ SEND เลือก `ir_send_sharp()` สำหรับ Profile ที่เรียนเป็น Sharp
 - [ ] เปรียบเทียบ raw timing กับข้อมูลที่ `flash_storage` บันทึกอยู่
+- [x] เพิ่ม NEC decoder/sender แบบ 32-bit LSB-first
+- [ ] ทดสอบเรียนและยิง NEC พร้อมวัด Flash/RAM
+- [x] เพิ่ม Samsung decoder/sender แบบ 32-bit LSB-first
+- [ ] ทดสอบเรียนและยิง Samsung พร้อมวัด Flash/RAM
+- [x] เพิ่ม LG decoder/sender แบบ 28-bit
+- [x] เพิ่ม Sony/SIRC decoder/sender แบบ 12/15/20-bit
+- [x] เพิ่ม JVC decoder/sender แบบ 16-bit
+- [ ] ทดสอบจริง Samsung/LG/Sony/JVC และตรวจ protocol repeat ของแต่ละรุ่น
 
 ## Experiment Log
 

@@ -56,6 +56,73 @@ void ir_send_code(uint32_t code) {
     ir_space(1000);
 }
 
+// NEC standard: leader 9000/4500us, 32 bits LSB-first
+void ir_send_nec(uint32_t code) {
+    if (code == 0) return;
+
+    printf("[IR TX NEC] raw=0x%08lX\r\n", code);
+    ir_carrier_burst(9000);
+    ir_space(4500);
+    for (uint8_t bit = 0; bit < 32; bit++) {
+        ir_carrier_burst(560);
+        ir_space((code & (1UL << bit)) ? 1690 : 560);
+    }
+    ir_carrier_burst(560);
+    ir_space(40000);
+}
+
+// Samsung: leader 4500/4500us, 32 bits LSB-first
+void ir_send_samsung(uint32_t code) {
+    if (code == 0) return;
+
+    printf("[IR TX SAMSUNG] raw=0x%08lX\r\n", code);
+    ir_carrier_burst(4500);
+    ir_space(4500);
+    for (uint8_t bit = 0; bit < 32; bit++) {
+        ir_carrier_burst(560);
+        ir_space((code & (1UL << bit)) ? 1690 : 560);
+    }
+    ir_carrier_burst(560);
+    ir_space(40000);
+}
+
+void ir_send_lg(uint32_t code) {
+    if (code == 0) return;
+    printf("[IR TX LG] raw=0x%08lX\r\n", code);
+    ir_carrier_burst(9000);
+    ir_space(4500);
+    for (uint8_t bit = 0; bit < 28; bit++) {
+        ir_carrier_burst(560);
+        ir_space((code & (1UL << bit)) ? 1690 : 560);
+    }
+    ir_carrier_burst(560);
+    ir_space(40000);
+}
+
+void ir_send_sony(uint32_t code, uint8_t bits) {
+    if (code == 0 || (bits != 12 && bits != 15 && bits != 20)) return;
+    printf("[IR TX SONY] raw=0x%08lX bits=%u\r\n", code, bits);
+    ir_carrier_burst(2400);
+    ir_space(600);
+    for (uint8_t bit = 0; bit < bits; bit++) {
+        ir_carrier_burst((code & (1UL << bit)) ? 1200 : 600);
+        ir_space(600);
+    }
+    ir_space(25000);
+}
+
+void ir_send_jvc(uint16_t code) {
+    printf("[IR TX JVC] raw=0x%04X\r\n", code);
+    ir_carrier_burst(8400);
+    ir_space(4200);
+    for (uint8_t bit = 0; bit < 16; bit++) {
+        ir_carrier_burst(525);
+        ir_space((code & (1U << bit)) ? 1575 : 525);
+    }
+    ir_carrier_burst(525);
+    ir_space(45000);
+}
+
 static void ir_send_sharp_frame(uint16_t raw_code) {
     for (uint8_t bit = 0; bit < 15; bit++) {
         ir_carrier_burst(260);

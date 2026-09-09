@@ -9,6 +9,8 @@
 
 static uint16_t raw_pulses[IR_RAW_MAX_PULSES];
 static uint16_t raw_frame_number;
+static uint8_t last_protocol;
+static uint8_t last_bits;
 
 static inline uint8_t ir_rx_level(void) {
     return (GPIOD->INDR & (1 << IR_RX_PIN)) ? 1 : 0;
@@ -98,6 +100,96 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
     }
     printf("\r\n");
 
+    // NEC: leader 9000/4500us, 32 bits LSB-first
+    if (pulse_count >= 66 && raw_pulses[0] > 7000 && raw_pulses[0] < 11000 &&
+        raw_pulses[1] > 3000 && raw_pulses[1] < 6000) {
+        uint32_t data = 0;
+        for (uint8_t i = 0; i < 32; i++) {
+            uint16_t mark = raw_pulses[2 + (i * 2)];
+            uint16_t space = raw_pulses[3 + (i * 2)];
+            if (mark < 300 || mark > 900 || space == 0) return 0;
+            if (space > 1000) data |= (1UL << i);
+        }
+
+        last_protocol = IR_PROTOCOL_NEC;
+        last_bits = 32;
+        printf("[IR NEC] raw=0x%08lX\r\n", data);
+        if (code_out) *code_out = data;
+        return 1;
+    }
+
+    // Samsung: leader 4500/4500us, 32 bits LSB-first
+    if (pulse_count >= 66 && raw_pulses[0] > 3500 && raw_pulses[0] < 6000 &&
+        raw_pulses[1] > 3500 && raw_pulses[1] < 6000) {
+        uint32_t data = 0;
+        for (uint8_t i = 0; i < 32; i++) {
+            uint16_t mark = raw_pulses[2 + (i * 2)];
+            uint16_t space = raw_pulses[3 + (i * 2)];
+            if (mark < 300 || mark > 900 || space == 0) return 0;
+            if (space > 1000) data |= (1UL << i);
+        }
+
+        last_protocol = IR_PROTOCOL_SAMSUNG;
+        last_bits = 32;
+        printf("[IR SAMSUNG] raw=0x%08lX\r\n", data);
+        if (code_out) *code_out = data;
+        return 1;
+    }
+
+    // LG: leader 9000/4500us, 28 bits LSB-first
+    if (pulse_count >= 58 && raw_pulses[0] > 7000 && raw_pulses[0] < 11000 &&
+        raw_pulses[1] > 3000 && raw_pulses[1] < 6000) {
+        uint32_t data = 0;
+        for (uint8_t i = 0; i < 28; i++) {
+            uint16_t mark = raw_pulses[2 + (i * 2)];
+            uint16_t space = raw_pulses[3 + (i * 2)];
+            if (mark < 300 || mark > 900 || space == 0) return 0;
+            if (space > 1000) data |= (1UL << i);
+        }
+        last_protocol = IR_PROTOCOL_LG;
+        last_bits = 28;
+        printf("[IR LG] raw=0x%08lX\r\n", data);
+        if (code_out) *code_out = data;
+        return 1;
+    }
+
+    // Sony/SIRC: header 2400/600us, pulse-width bits, LSB-first
+    if (pulse_count >= 27 && raw_pulses[0] > 1800 && raw_pulses[0] < 3000 &&
+        raw_pulses[1] > 300 && raw_pulses[1] < 1000) {
+        uint8_t bits = (pulse_count - 3) / 2;
+        if (bits != 12 && bits != 15 && bits != 20) return 0;
+
+        uint32_t data = 0;
+        for (uint8_t i = 0; i < bits; i++) {
+            uint16_t mark = raw_pulses[2 + (i * 2)];
+            uint16_t space = raw_pulses[3 + (i * 2)];
+            if (mark < 400 || mark > 1500 || space < 300 || space > 1000) return 0;
+            if (mark > 900) data |= (1UL << i);
+        }
+        last_protocol = IR_PROTOCOL_SONY;
+        last_bits = bits;
+        printf("[IR SONY] raw=0x%08lX bits=%u\r\n", data, bits);
+        if (code_out) *code_out = data;
+        return 1;
+    }
+
+    // JVC: leader 8400/4200us, 16 bits LSB-first
+    if (pulse_count >= 34 && raw_pulses[0] > 6500 && raw_pulses[0] < 10000 &&
+        raw_pulses[1] > 3000 && raw_pulses[1] < 5500) {
+        uint32_t data = 0;
+        for (uint8_t i = 0; i < 16; i++) {
+            uint16_t mark = raw_pulses[2 + (i * 2)];
+            uint16_t space = raw_pulses[3 + (i * 2)];
+            if (mark < 300 || mark > 800 || space == 0) return 0;
+            if (space > 1000) data |= (1UL << i);
+        }
+        last_protocol = IR_PROTOCOL_JVC;
+        last_bits = 16;
+        printf("[IR JVC] raw=0x%04lX\r\n", data);
+        if (code_out) *code_out = data;
+        return 1;
+    }
+
     // Sharp/Denon: 15 bits, LSB-first, ไม่มี header แยก
     if (pulse_count < 31 || raw_pulses[0] < 150 || raw_pulses[0] > 500) {
         return 0;
@@ -122,6 +214,11 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
            data, address, command, frame_marker);
 
     if (frame_marker != 1) return 0;
+    last_protocol = IR_PROTOCOL_SHARP;
+    last_bits = IR_SHARP_BITS;
     if (code_out) *code_out = data;
     return 1;
 }
+
+uint8_t ir_recv_last_protocol(void) { return last_protocol; }
+uint8_t ir_recv_last_bits(void) { return last_bits; }

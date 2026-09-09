@@ -202,8 +202,8 @@ int main()
             if (ir_recv_poll(&new_ir_code))
             {
                 captured_code = new_ir_code;
-                active_protocol = IR_PROTOCOL_SHARP;
-                active_bits = IR_SHARP_BITS;
+                active_protocol = ir_recv_last_protocol();
+                active_bits = ir_recv_last_bits();
                 ir_captured = 1;
                 oled_render_ir_captured_screen(current_profile_name, captured_code);
             }
@@ -546,6 +546,17 @@ int main()
                         if (code != 0) {
                             if (active_protocol == IR_PROTOCOL_SHARP && active_bits == IR_SHARP_BITS) {
                                 ir_send_sharp((uint16_t)code);
+                            } else if (active_protocol == IR_PROTOCOL_NEC && active_bits == 32) {
+                                ir_send_nec(code);
+                            } else if (active_protocol == IR_PROTOCOL_SAMSUNG && active_bits == 32) {
+                                ir_send_samsung(code);
+                            } else if (active_protocol == IR_PROTOCOL_LG && active_bits == 28) {
+                                ir_send_lg(code);
+                            } else if (active_protocol == IR_PROTOCOL_SONY &&
+                                       (active_bits == 12 || active_bits == 15 || active_bits == 20)) {
+                                ir_send_sony(code, active_bits);
+                            } else if (active_protocol == IR_PROTOCOL_JVC && active_bits == 16) {
+                                ir_send_jvc((uint16_t)code);
                             } else {
                                 ir_send_code(code);
                             }

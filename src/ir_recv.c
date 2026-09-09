@@ -1,5 +1,4 @@
 #include "ir_recv.h"
-#include <stdio.h>
 
 #define IR_RAW_MAX_PULSES 96
 #define IR_RAW_LOW_TIMEOUT_US 12000
@@ -8,7 +7,6 @@
 #define IR_SYNC_TIMEOUT_US 80000
 
 static uint16_t raw_pulses[IR_RAW_MAX_PULSES];
-static uint16_t raw_frame_number;
 static uint8_t last_protocol;
 static uint8_t last_bits;
 
@@ -93,13 +91,6 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
 
     if (pulse_count < 3) return 0;
 
-    raw_frame_number++;
-    printf("[IR RAW FRAME %u] pulses=%u:", raw_frame_number, pulse_count);
-    for (uint8_t i = 0; i < pulse_count; i++) {
-        printf(" %u", raw_pulses[i]);
-    }
-    printf("\r\n");
-
     // NEC: leader 9000/4500us, 32 bits LSB-first
     if (pulse_count >= 66 && raw_pulses[0] > 7000 && raw_pulses[0] < 11000 &&
         raw_pulses[1] > 3000 && raw_pulses[1] < 6000) {
@@ -113,7 +104,6 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
 
         last_protocol = IR_PROTOCOL_NEC;
         last_bits = 32;
-        printf("[IR NEC] raw=0x%08lX\r\n", data);
         if (code_out) *code_out = data;
         return 1;
     }
@@ -131,7 +121,6 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
 
         last_protocol = IR_PROTOCOL_SAMSUNG;
         last_bits = 32;
-        printf("[IR SAMSUNG] raw=0x%08lX\r\n", data);
         if (code_out) *code_out = data;
         return 1;
     }
@@ -148,7 +137,6 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
         }
         last_protocol = IR_PROTOCOL_LG;
         last_bits = 28;
-        printf("[IR LG] raw=0x%08lX\r\n", data);
         if (code_out) *code_out = data;
         return 1;
     }
@@ -168,7 +156,6 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
         }
         last_protocol = IR_PROTOCOL_SONY;
         last_bits = bits;
-        printf("[IR SONY] raw=0x%08lX bits=%u\r\n", data, bits);
         if (code_out) *code_out = data;
         return 1;
     }
@@ -185,7 +172,6 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
         }
         last_protocol = IR_PROTOCOL_JVC;
         last_bits = 16;
-        printf("[IR JVC] raw=0x%04lX\r\n", data);
         if (code_out) *code_out = data;
         return 1;
     }
@@ -207,11 +193,7 @@ uint8_t ir_recv_poll(uint32_t *code_out) {
         }
     }
 
-    uint8_t address = data & 0x1F;
-    uint8_t command = (data >> 5) & 0xFF;
     uint8_t frame_marker = (data >> 13) & 0x03;
-    printf("[IR SHARP] raw=0x%04lX addr=0x%02X cmd=0x%02X marker=%u\r\n",
-           data, address, command, frame_marker);
 
     if (frame_marker != 1) return 0;
     last_protocol = IR_PROTOCOL_SHARP;

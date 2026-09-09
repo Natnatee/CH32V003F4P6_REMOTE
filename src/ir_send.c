@@ -1,5 +1,4 @@
 #include "ir_send.h"
-#include <stdio.h>
 
 void ir_send_init(void) {
     // 1. เปิด Clock ให้ GPIOD
@@ -35,8 +34,6 @@ static inline void ir_space(uint32_t duration_us) {
 void ir_send_code(uint32_t code) {
     if (code == 0) return;
 
-    printf("[IR TX] Transmitting 38kHz Code: 0x%08lX...\r\n", code);
-
     // 1. Leader Pulse: 9000µs Burst + 4500µs Space
     ir_carrier_burst(9000);
     ir_space(4500);
@@ -60,7 +57,6 @@ void ir_send_code(uint32_t code) {
 void ir_send_nec(uint32_t code) {
     if (code == 0) return;
 
-    printf("[IR TX NEC] raw=0x%08lX\r\n", code);
     ir_carrier_burst(9000);
     ir_space(4500);
     for (uint8_t bit = 0; bit < 32; bit++) {
@@ -75,7 +71,6 @@ void ir_send_nec(uint32_t code) {
 void ir_send_samsung(uint32_t code) {
     if (code == 0) return;
 
-    printf("[IR TX SAMSUNG] raw=0x%08lX\r\n", code);
     ir_carrier_burst(4500);
     ir_space(4500);
     for (uint8_t bit = 0; bit < 32; bit++) {
@@ -88,7 +83,6 @@ void ir_send_samsung(uint32_t code) {
 
 void ir_send_lg(uint32_t code) {
     if (code == 0) return;
-    printf("[IR TX LG] raw=0x%08lX\r\n", code);
     ir_carrier_burst(9000);
     ir_space(4500);
     for (uint8_t bit = 0; bit < 28; bit++) {
@@ -101,7 +95,6 @@ void ir_send_lg(uint32_t code) {
 
 void ir_send_sony(uint32_t code, uint8_t bits) {
     if (code == 0 || (bits != 12 && bits != 15 && bits != 20)) return;
-    printf("[IR TX SONY] raw=0x%08lX bits=%u\r\n", code, bits);
     ir_carrier_burst(2400);
     ir_space(600);
     for (uint8_t bit = 0; bit < bits; bit++) {
@@ -112,7 +105,6 @@ void ir_send_sony(uint32_t code, uint8_t bits) {
 }
 
 void ir_send_jvc(uint16_t code) {
-    printf("[IR TX JVC] raw=0x%04X\r\n", code);
     ir_carrier_burst(8400);
     ir_space(4200);
     for (uint8_t bit = 0; bit < 16; bit++) {
@@ -135,7 +127,6 @@ static void ir_send_sharp_frame(uint16_t raw_code) {
 void ir_send_sharp(uint16_t raw_code) {
     uint16_t inverted = raw_code ^ 0x7FE0;
 
-    printf("[IR TX SHARP] raw=0x%04X inverted=0x%04X frames=3\r\n", raw_code, inverted);
     ir_send_sharp_frame(raw_code);
     ir_space(45000);
     ir_send_sharp_frame(inverted);

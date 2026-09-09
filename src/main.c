@@ -247,7 +247,8 @@ int main()
                     int idx = key_to_index(key);
                     if (idx >= 0)
                     {
-                        active_codes[idx] = captured_code;
+                        active_codes[idx] = flash_encode_ir_button((uint8_t)idx, captured_code,
+                                                                   active_protocol, active_bits);
                         flash_save_profile(current_profile, active_codes, current_profile_name, active_protocol, active_bits);
                         ir_captured = 0;
 
@@ -304,7 +305,8 @@ int main()
                     if (idx >= 0)
                     {
                         uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
-                        active_codes[idx] = test_code;
+                        active_codes[idx] = flash_encode_ir_button((uint8_t)idx, test_code,
+                                                                   IR_PROTOCOL_NEC, 32);
                         flash_save_profile(current_profile, active_codes, current_profile_name, active_protocol, active_bits);
                         new_preview_active = 0;
                         new_preview_ticks = 0;
@@ -540,22 +542,25 @@ int main()
                     int idx = key_to_index(key);
                     if (idx >= 0)
                     {
-                        uint32_t code = active_codes[idx];
+                        uint32_t code;
+                        uint8_t button_protocol, button_bits;
+                        flash_decode_ir_button((uint8_t)idx, active_codes[idx], &code,
+                                               &button_protocol, &button_bits);
 
                         // สั่งยิงสัญญาณ IR 38kHz ออกขา PD4 ทันทีถ้ามีโค้ด
                         if (code != 0) {
-                            if (active_protocol == IR_PROTOCOL_SHARP && active_bits == IR_SHARP_BITS) {
+                            if (button_protocol == IR_PROTOCOL_SHARP && button_bits == IR_SHARP_BITS) {
                                 ir_send_sharp((uint16_t)code);
-                            } else if (active_protocol == IR_PROTOCOL_NEC && active_bits == 32) {
+                            } else if (button_protocol == IR_PROTOCOL_NEC && button_bits == 32) {
                                 ir_send_nec(code);
-                            } else if (active_protocol == IR_PROTOCOL_SAMSUNG && active_bits == 32) {
+                            } else if (button_protocol == IR_PROTOCOL_SAMSUNG && button_bits == 32) {
                                 ir_send_samsung(code);
-                            } else if (active_protocol == IR_PROTOCOL_LG && active_bits == 28) {
+                            } else if (button_protocol == IR_PROTOCOL_LG && button_bits == 28) {
                                 ir_send_lg(code);
-                            } else if (active_protocol == IR_PROTOCOL_SONY &&
-                                       (active_bits == 12 || active_bits == 15 || active_bits == 20)) {
-                                ir_send_sony(code, active_bits);
-                            } else if (active_protocol == IR_PROTOCOL_JVC && active_bits == 16) {
+                            } else if (button_protocol == IR_PROTOCOL_SONY &&
+                                       (button_bits == 12 || button_bits == 15 || button_bits == 20)) {
+                                ir_send_sony(code, button_bits);
+                            } else if (button_protocol == IR_PROTOCOL_JVC && button_bits == 16) {
                                 ir_send_jvc((uint16_t)code);
                             } else {
                                 ir_send_code(code);

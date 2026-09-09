@@ -18,3 +18,9 @@ void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes, char *activ
 // บันทึกข้อมูลปุ่ม 12 ปุ่ม และชื่อโปรไฟล์ลง Flash ROM ถาวร
 void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes, const char *active_name,
                         uint8_t active_protocol, uint8_t active_bits);
+
+// Encode/decode protocol metadata independently for each of the 12 buttons.
+uint32_t flash_encode_ir_button(uint8_t button_idx, uint32_t raw_code,
+                                uint8_t protocol, uint8_t bits);
+void flash_decode_ir_button(uint8_t button_idx, uint32_t stored_code,
+                            uint32_t *raw_code, uint8_t *protocol, uint8_t *bits);

@@ -1,4 +1,5 @@
 #include "tetris.h"
+#include "ch32fun.h"
 #include "ssd1306.h"
 #include <string.h>
 
@@ -7,6 +8,8 @@
 #define BLOCK_SIZE      5
 #define BOARD_OFFSET_X  7
 #define BOARD_OFFSET_Y  16
+#define TETRIS_SCORE_ADDR  0x08003BC0UL
+#define TETRIS_SCORE_MAGIC 0x54455452UL
 
 // รูปทรง Tetromino 7 แบบ (I, J, L, O, S, T, Z) ในเมทริกซ์ 4x4
 static const uint16_t TETROMINOES[7] = {
@@ -33,8 +36,43 @@ static uint16_t drop_interval = 20;
 
 static uint8_t hold_down_ticks = 0;
 static uint8_t hold_lr_ticks = 0;
+static uint8_t high_score_loaded = 0;
 
 static uint32_t rng_state = 0x5A5A1234;
+
+static void load_high_score(void) {
+    const uint32_t *data = (const uint32_t *)TETRIS_SCORE_ADDR;
+    high_score = data[0] == TETRIS_SCORE_MAGIC ? data[1] : 0;
+    high_score_loaded = 1;
+}
+
+static void save_high_score(void) {
+    const uint32_t *old = (const uint32_t *)TETRIS_SCORE_ADDR;
+    if (old[0] == TETRIS_SCORE_MAGIC && old[1] >= high_score) return;
+
+    volatile uint32_t *dst = (volatile uint32_t *)TETRIS_SCORE_ADDR;
+    FLASH->KEYR = FLASH_KEY1;
+    FLASH->KEYR = FLASH_KEY2;
+    FLASH->MODEKEYR = FLASH_KEY1;
+    FLASH->MODEKEYR = FLASH_KEY2;
+    FLASH->CTLR = CR_PAGE_ER;
+    FLASH->ADDR = (intptr_t)dst;
+    FLASH->CTLR = CR_STRT_Set | CR_PAGE_ER;
+    while (FLASH->STATR & FLASH_STATR_BSY);
+
+    FLASH->CTLR = CR_PAGE_PG;
+    FLASH->CTLR = CR_BUF_RST | CR_PAGE_PG;
+    FLASH->ADDR = (intptr_t)dst;
+    while (FLASH->STATR & FLASH_STATR_BSY);
+    for (uint8_t i = 0; i < 16; i++) {
+        dst[i] = i == 0 ? TETRIS_SCORE_MAGIC : (i == 1 ? high_score : 0);
+        FLASH->CTLR = CR_PAGE_PG | FLASH_CTLR_BUF_LOAD;
+        while (FLASH->STATR & FLASH_STATR_BSY);
+    }
+    FLASH->CTLR = CR_PAGE_PG | CR_STRT_Set;
+    while (FLASH->STATR & FLASH_STATR_BSY);
+    FLASH->CTLR = CR_LOCK_Set;
+}
 
 static void u32_to_str_padded(uint32_t val, char *buf, int len) {
     buf[len] = '\0';
@@ -153,10 +191,12 @@ static void lock_piece(void) {
         if (score > high_score) {
             high_score = score;
         }
+        save_high_score();
     }
 }
 
 void tetris_init(void) {
+    if (!high_score_loaded) load_high_score();
     memset(board, 0, sizeof(board));
     score = 0;
     lines_cleared = 0;
@@ -204,6 +244,7 @@ void tetris_handle_key(uint8_t key, uint8_t is_new) {
         hold_lr_ticks = 0;
 
         if (key == 16) {
+            save_high_score();
             exit_requested = 1;
             return;
         }

@@ -6,15 +6,16 @@
 #include "ir_send.h"
 #include "flash_storage.h"
 #include "ir_database.h"
+#include "tetris.h"
 #include "calc.h"
 #include "ina226.h"
 
-// 6 โหมดการทำงานหลัก (SEND, LEARN, NEW, RENAME, CALC, METER)
+// 6 โหมดการทำงานหลัก
 typedef enum {
     MODE_SEND = 0,
     MODE_LEARN = 1,
-    MODE_NEW = 2,
-    MODE_RENAME = 3,
+    MODE_RENAME = 2,
+    MODE_TETRIS = 3,
     MODE_CALC = 4,
     MODE_METER = 5
 } RemoteMode;
@@ -22,8 +23,8 @@ typedef enum {
 static const char *mode_names[6] = {
     "SEND",
     "LRN ",
-    "NEW ",
     "NAME",
+    "TETR",
     "CALC",
     "METR"
 };
@@ -31,8 +32,8 @@ static const char *mode_names[6] = {
 static const char *mode_select_labels[6] = {
     "[ SEND ]",
     "[ LEARN ]",
-    "[  NEW  ]",
     "[ RENAME ]",
+    "[ TETRIS ]",
     "[  CALC  ]",
     "[ METER ]"
 };
@@ -75,7 +76,6 @@ static void send_profile_button(uint8_t idx, uint8_t repeat) {
     else if (protocol == IR_PROTOCOL_LG) ir_send_lg(code);
     else if (protocol == IR_PROTOCOL_SONY) ir_send_sony(code, bits);
     else if (protocol == IR_PROTOCOL_JVC) ir_send_jvc((uint16_t)code);
-    else ir_send_code(code);
 }
 
 // ตารางตัวอักษรสำหรับปุ่ม 1..15 ในโหมด RENAME
@@ -140,11 +140,6 @@ int main()
     uint8_t ir_captured = 0;
     uint32_t captured_code = 0;
 
-    // ตัวแปรสำหรับโหมด NEW (Brute-Force Generator)
-    uint16_t new_brute_idx = 0;
-    uint8_t new_preview_active = 0;
-    uint32_t new_preview_ticks = 0;
-
     // ตัวแปรสำหรับโหมด RENAME
     uint8_t rename_editing = 0;
     uint8_t rename_cursor = 0;
@@ -162,6 +157,34 @@ int main()
 
     while (1)
     {
+        // --- 0.1 โหมดพิเศษ: TETRIS GAME ---
+        if (current_mode == MODE_TETRIS && !mode_select_active)
+        {
+            uint8_t key = keypad_scan(&row, &col);
+            uint8_t is_new = (key != 0 && key != last_key);
+            if (key != 0) {
+                last_key = key;
+                tetris_handle_key(key, is_new);
+            } else {
+                last_key = 0;
+                tetris_handle_key(0, 0);
+            }
+
+            if (tetris_should_exit()) {
+                mode_select_active = 1;
+                selected_mode = current_mode;
+                mode_blink_state = 1;
+                blink_tick = 0;
+                oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
+            } else {
+                tetris_update();
+                tetris_render();
+            }
+
+            Delay_Ms(20);
+            continue;
+        }
+
         // --- 0.1 โหมดพิเศษ: CALCULATOR ---
         if (current_mode == MODE_CALC && !mode_select_active)
         {
@@ -226,19 +249,6 @@ int main()
             }
         }
 
-        // --- 2. นับถอยหลัง 5 วินาทีในโหมด NEW Preview ---
-        if (current_mode == MODE_NEW && new_preview_active && !mode_select_active)
-        {
-            new_preview_ticks++;
-            if (new_preview_ticks >= 250) // 250 * 20ms = 5,000ms (5 วินาที)
-            {
-                new_preview_active = 0;
-                new_preview_ticks = 0;
-                get_footer_str(footer_buf, current_mode, current_profile);
-                oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
-            }
-        }
-
         // --- 3. สแกนปุ่มกด Keypad 4x4 ---
         uint8_t key = keypad_scan(&row, &col);
 
@@ -269,65 +279,6 @@ int main()
                                                                    active_protocol, active_bits);
                         flash_save_profile(current_profile, active_codes, current_profile_name, active_protocol, active_bits);
                         ir_captured = 0;
-
-                        get_footer_str(footer_buf, current_mode, current_profile);
-                        oled_render_grid_screen(current_profile_name, footer_buf, key, 1, active_codes);
-                        Delay_Ms(300);
-                        oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
-                    }
-                }
-            }
-            // ==========================================
-            // กรณีที่ 2: หน้ากวาดยิงรหัส (โหมด NEW Preview 5 วินาที)
-            // ==========================================
-            else if (current_mode == MODE_NEW && new_preview_active && !mode_select_active)
-            {
-                if (key == 4)
-                {
-                    // ปุ่ม 4: UP เลื่อนรหัสถัดไป (+1)
-                    new_brute_idx = (new_brute_idx + 1) % TOTAL_BRUTE_COMMANDS;
-                    uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
-                    ir_send_code(test_code);
-                    oled_render_new_code_screen(current_profile_name, test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
-                    new_preview_ticks = 0;
-                }
-                else if (key == 8)
-                {
-                    // ปุ่ม 8: DOWN เลื่อนรหัสก่อนหน้า (-1)
-                    new_brute_idx = (new_brute_idx + TOTAL_BRUTE_COMMANDS - 1) % TOTAL_BRUTE_COMMANDS;
-                    uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
-                    ir_send_code(test_code);
-                    oled_render_new_code_screen(current_profile_name, test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
-                    new_preview_ticks = 0;
-                }
-                else if (key == 12)
-                {
-                    // ปุ่ม 12: OK ยิงรหัสเดิมซ้ำอีกรอบ (RETRY)
-                    uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
-                    ir_send_code(test_code);
-                    oled_render_new_code_screen(current_profile_name, test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
-                    new_preview_ticks = 0;
-                }
-                else if (key == 16)
-                {
-                    // ปุ่ม 16: BACK ยกเลิกหน้านี้ กลับสู่ตารางทันที
-                    new_preview_active = 0;
-                    new_preview_ticks = 0;
-                    get_footer_str(footer_buf, current_mode, current_profile);
-                    oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
-                }
-                else
-                {
-                    // กดปุ่มในตาราง 1..15 เพื่อบันทึกรหัสที่เพิ่งยิงลง Flash ROM!
-                    int idx = key_to_index(key);
-                    if (idx >= 0)
-                    {
-                        uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
-                        active_codes[idx] = flash_encode_ir_button((uint8_t)idx, test_code,
-                                                                   IR_PROTOCOL_NEC, 32);
-                        flash_save_profile(current_profile, active_codes, current_profile_name, active_protocol, active_bits);
-                        new_preview_active = 0;
-                        new_preview_ticks = 0;
 
                         get_footer_str(footer_buf, current_mode, current_profile);
                         oled_render_grid_screen(current_profile_name, footer_buf, key, 1, active_codes);
@@ -472,11 +423,12 @@ int main()
                     // ปุ่ม 12: OK ยืนยันโหมด
                     current_mode = selected_mode;
                     mode_select_active = 0;
-                    new_preview_active = 0;
-                    new_brute_idx = 0;
                     rename_editing = 0;
 
-                    if (current_mode == MODE_CALC) {
+                    if (current_mode == MODE_TETRIS) {
+                        tetris_init();
+                        tetris_render();
+                    } else if (current_mode == MODE_CALC) {
                         calc_init();
                         calc_render();
                     } else if (current_mode == MODE_METER) {
@@ -497,6 +449,8 @@ int main()
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     } else if (current_mode == MODE_CALC) {
                         calc_render();
+                    } else if (current_mode == MODE_TETRIS) {
+                        tetris_render();
                     } else if (current_mode == MODE_METER) {
                         ina226_render();
                     } else {
@@ -506,7 +460,7 @@ int main()
                 }
             }
             // ==========================================
-            // กรณีที่ 5: อยู่ในหน้าตาราง 3x4 ปกติ (SEND / LEARN / NEW)
+            // กรณีที่ 5: อยู่ในหน้าตาราง 3x4 ปกติ (SEND / LEARN)
             // ==========================================
             else
             {
@@ -518,21 +472,6 @@ int main()
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
-                }
-                else if (current_mode == MODE_NEW && (key == 4 || key == 8))
-                {
-                    // ในโหมด NEW: กด 4 (UP) หรือ 8 (DOWN) เพื่อเริ่มกวาดยิงรหัส 256 คำสั่ง
-                    if (key == 4) {
-                        new_brute_idx = (new_brute_idx + 1) % TOTAL_BRUTE_COMMANDS;
-                    } else {
-                        new_brute_idx = (new_brute_idx + TOTAL_BRUTE_COMMANDS - 1) % TOTAL_BRUTE_COMMANDS;
-                    }
-
-                    uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
-                    ir_send_code(test_code);
-                    oled_render_new_code_screen(current_profile_name, test_code, new_brute_idx, TOTAL_BRUTE_COMMANDS);
-                    new_preview_active = 1;
-                    new_preview_ticks = 0;
                 }
                 else if (key == 4)
                 {

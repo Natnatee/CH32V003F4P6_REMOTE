@@ -108,6 +108,7 @@ pio run -t upload
 - **RAM Optimization:** ถือเฉพาะ Active Profile ปัจจุบันใน RAM (12 ปุ่ม x 4B = 48 ไบต์) ลดการใช้ RAM ลงมหาศาล
 - **ระบบ IR Transmitter (PD4):** ยิงคลื่นพาหะ 38kHz PWM ส่งชุดรหัส 32-bit (NEC / Samsung) ในโหมด SEND ทันทีเมื่อกดปุ่มที่มีรหัส
 - **ระบบ IR Receiver (PD0):** รับสัญญาณและถอดรหัส 32-bit จากรีโมทจริงในโหมด LEARN
+- **Tetris High Score Storage (`0x08003BC0`):** ใช้ Flash 1 หน้า (64 ไบต์) แยกจากพื้นที่ 16 Profiles ที่เริ่ม `0x08003C00`; linker จำกัด firmware ไม่ให้ล้ำพื้นที่นี้
 
 ## Open Questions
 - การพัฒนาโหมด NEW (Auto Brute-Force Code Search) สำหรับกวาดฐานข้อมูลรหัสทีวี/แอร์

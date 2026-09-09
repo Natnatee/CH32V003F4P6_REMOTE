@@ -96,6 +96,21 @@
 
 ## Getting Started
 
+## Sharp IR Protocol (ทดสอบสำเร็จ)
+
+การรับและส่งรีโมท Sharp ทดสอบกับทีวีจริงสำเร็จแล้ว โดยใช้เฉพาะ logic decoder แบบ Sharp/Denon ที่พอร์ตจากโปรเจกต์ STM32 ไม่ได้นำไลบรารี IR ทั้งชุดมาใช้
+
+- รูปแบบ: 15-bit, LSB-first, pulse-distance
+- Timing โดยประมาณ: mark `260µs`, zero space `780µs`, one space `1820µs`
+- ข้อมูลทดสอบ: raw `0x2D71`
+- Address: `0x11`
+- Command: `0x6B`
+- Frame marker: `01`
+- การส่งซ้ำ: `normal → inverted → normal` เว้นช่วงประมาณ `45ms`
+- โค้ดที่เกี่ยวข้อง: `src/ir_recv.c` และ `src/ir_send.c`
+
+ปุ่มทดสอบชั่วคราว: ในโหมด `SEND` กดปุ่ม `12 (OK)` เพื่อยิง Sharp raw ที่บันทึกไว้
+
 ### 1. คอมไพล์โปรเจกต์ (Build)
 ```bash
 pio run

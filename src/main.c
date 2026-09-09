@@ -6,37 +6,33 @@
 #include "ir_send.h"
 #include "flash_storage.h"
 #include "ir_database.h"
-#include "tetris.h"
 #include "calc.h"
 #include "ina226.h"
 
-// 7 โหมดการทำงานหลัก (SEND, LEARN, NEW, RENAME, TETRIS, CALC, METER)
+// 6 โหมดการทำงานหลัก (SEND, LEARN, NEW, RENAME, CALC, METER)
 typedef enum {
     MODE_SEND = 0,
     MODE_LEARN = 1,
     MODE_NEW = 2,
     MODE_RENAME = 3,
-    MODE_TETRIS = 4,
-    MODE_CALC = 5,
-    MODE_METER = 6
+    MODE_CALC = 4,
+    MODE_METER = 5
 } RemoteMode;
 
-static const char *mode_names[7] = {
+static const char *mode_names[6] = {
     "SEND",
     "LRN ",
     "NEW ",
     "NAME",
-    "TETR",
     "CALC",
     "METR"
 };
 
-static const char *mode_select_labels[7] = {
+static const char *mode_select_labels[6] = {
     "[ SEND ]",
     "[ LEARN ]",
     "[  NEW  ]",
     "[ RENAME ]",
-    "[ TETRIS ]",
     "[  CALC  ]",
     "[ METER ]"
 };
@@ -44,6 +40,8 @@ static const char *mode_select_labels[7] = {
 // บัฟเฟอร์ใน RAM สำหรับถือเฉพาะโปรไฟล์ปัจจุบันที่กำลังใช้งาน (12 ปุ่ม = 48 ไบต์เท่านั้น!)
 static uint32_t active_codes[12];
 static char current_profile_name[8];
+static uint8_t active_protocol = 0;
+static uint8_t active_bits = 0;
 
 // แปลงหมายเลขปุ่ม (1..15) เป็น Index ในตาราง (0..11)
 static int key_to_index(uint8_t key) {
@@ -120,7 +118,7 @@ int main()
     uint8_t mode_select_active = 0;
 
     // โหลดข้อมูลปุ่มและชื่อของ Profile 01 จาก Flash ROM เข้าสู่ RAM
-    flash_load_profile(current_profile, active_codes, current_profile_name);
+    flash_load_profile(current_profile, active_codes, current_profile_name, &active_protocol, &active_bits);
 
     // ตัวแปรสำหรับโหมด LEARN
     uint8_t ir_captured = 0;
@@ -147,35 +145,7 @@ int main()
 
     while (1)
     {
-        // --- 0.1 โหมดพิเศษ: TETRIS GAME ---
-        if (current_mode == MODE_TETRIS && !mode_select_active)
-        {
-            uint8_t key = keypad_scan(&row, &col);
-            uint8_t is_new = (key != 0 && key != last_key);
-            if (key != 0) {
-                last_key = key;
-                tetris_handle_key(key, is_new);
-            } else {
-                last_key = 0;
-                tetris_handle_key(0, 0);
-            }
-
-            if (tetris_should_exit()) {
-                mode_select_active = 1;
-                selected_mode = current_mode;
-                mode_blink_state = 1;
-                blink_tick = 0;
-                oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
-            } else {
-                tetris_update();
-                tetris_render();
-            }
-
-            Delay_Ms(20);
-            continue;
-        }
-
-        // --- 0.2 โหมดพิเศษ: CALCULATOR ---
+        // --- 0.1 โหมดพิเศษ: CALCULATOR ---
         if (current_mode == MODE_CALC && !mode_select_active)
         {
             uint8_t key = keypad_scan(&row, &col);
@@ -199,7 +169,7 @@ int main()
             continue;
         }
 
-        // --- 0.3 โหมดพิเศษ: MULTIMETER (INA226) ---
+        // --- 0.2 โหมดพิเศษ: MULTIMETER (INA226) ---
         if (current_mode == MODE_METER && !mode_select_active)
         {
             uint8_t key = keypad_scan(&row, &col);
@@ -232,6 +202,8 @@ int main()
             if (ir_recv_poll(&new_ir_code))
             {
                 captured_code = new_ir_code;
+                active_protocol = IR_PROTOCOL_SHARP;
+                active_bits = IR_SHARP_BITS;
                 ir_captured = 1;
                 oled_render_ir_captured_screen(current_profile_name, captured_code);
             }
@@ -276,7 +248,7 @@ int main()
                     if (idx >= 0)
                     {
                         active_codes[idx] = captured_code;
-                        flash_save_profile(current_profile, active_codes, current_profile_name);
+                        flash_save_profile(current_profile, active_codes, current_profile_name, active_protocol, active_bits);
                         ir_captured = 0;
 
                         get_footer_str(footer_buf, current_mode, current_profile);
@@ -333,7 +305,7 @@ int main()
                     {
                         uint32_t test_code = generate_brute_code(current_profile, (uint8_t)new_brute_idx);
                         active_codes[idx] = test_code;
-                        flash_save_profile(current_profile, active_codes, current_profile_name);
+                        flash_save_profile(current_profile, active_codes, current_profile_name, active_protocol, active_bits);
                         new_preview_active = 0;
                         new_preview_ticks = 0;
 
@@ -356,14 +328,14 @@ int main()
                     {
                         // ปุ่ม 4: UP เลื่อน Profile ถัดไป
                         current_profile = (current_profile + 1) % TOTAL_PROFILES_COUNT;
-                        flash_load_profile(current_profile, active_codes, current_profile_name);
+                        flash_load_profile(current_profile, active_codes, current_profile_name, &active_protocol, &active_bits);
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     }
                     else if (key == 8)
                     {
                         // ปุ่ม 8: DOWN เลื่อน Profile ก่อนหน้า
                         current_profile = (current_profile + TOTAL_PROFILES_COUNT - 1) % TOTAL_PROFILES_COUNT;
-                        flash_load_profile(current_profile, active_codes, current_profile_name);
+                        flash_load_profile(current_profile, active_codes, current_profile_name, &active_protocol, &active_bits);
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     }
                     else if (key == 12)
@@ -417,7 +389,7 @@ int main()
                         strncpy(current_profile_name, edit_name_buf, 7);
                         current_profile_name[7] = '\0';
 
-                        flash_save_profile(current_profile, active_codes, current_profile_name);
+                        flash_save_profile(current_profile, active_codes, current_profile_name, active_protocol, active_bits);
                         rename_editing = 0;
 
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
@@ -462,7 +434,7 @@ int main()
                 if (key == 4)
                 {
                     // ปุ่ม 4: UP
-                    selected_mode = (RemoteMode)((selected_mode + 6) % 7);
+                    selected_mode = (RemoteMode)((selected_mode + 5) % 6);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -470,7 +442,7 @@ int main()
                 else if (key == 8)
                 {
                     // ปุ่ม 8: DOWN
-                    selected_mode = (RemoteMode)((selected_mode + 1) % 7);
+                    selected_mode = (RemoteMode)((selected_mode + 1) % 6);
                     mode_blink_state = 1;
                     blink_tick = 0;
                     oled_render_grid_screen(current_profile_name, mode_select_labels[selected_mode], 0, 0, active_codes);
@@ -484,10 +456,7 @@ int main()
                     new_brute_idx = 0;
                     rename_editing = 0;
 
-                    if (current_mode == MODE_TETRIS) {
-                        tetris_init();
-                        tetris_render();
-                    } else if (current_mode == MODE_CALC) {
+                    if (current_mode == MODE_CALC) {
                         calc_init();
                         calc_render();
                     } else if (current_mode == MODE_METER) {
@@ -508,8 +477,6 @@ int main()
                         oled_render_rename_screen(current_profile_name, 0, 0, current_profile, 0);
                     } else if (current_mode == MODE_CALC) {
                         calc_render();
-                    } else if (current_mode == MODE_TETRIS) {
-                        tetris_render();
                     } else if (current_mode == MODE_METER) {
                         ina226_render();
                     } else {
@@ -551,7 +518,7 @@ int main()
                 {
                     // ปุ่ม 4: UP เลื่อน Profile ถัดไป (01 ➡️ 02 ➡️ ... ➡️ 16)
                     current_profile = (current_profile + 1) % TOTAL_PROFILES_COUNT;
-                    flash_load_profile(current_profile, active_codes, current_profile_name);
+                    flash_load_profile(current_profile, active_codes, current_profile_name, &active_protocol, &active_bits);
                     get_footer_str(footer_buf, current_mode, current_profile);
                     oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                 }
@@ -559,13 +526,13 @@ int main()
                 {
                     // ปุ่ม 8: DOWN เลื่อน Profile ก่อนหน้า (16 ⬅️ 15 ⬅️ ...)
                     current_profile = (current_profile + TOTAL_PROFILES_COUNT - 1) % TOTAL_PROFILES_COUNT;
-                    flash_load_profile(current_profile, active_codes, current_profile_name);
+                    flash_load_profile(current_profile, active_codes, current_profile_name, &active_protocol, &active_bits);
                     get_footer_str(footer_buf, current_mode, current_profile);
                     oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                 }
                 else if (key == 12)
                 {
-                    // ปุ่ม 12: OK
+                    // ปุ่ม 12: OK (สงวนไว้สำหรับฟังก์ชัน Profile/IR ในอนาคต)
                 }
                 else
                 {
@@ -577,7 +544,11 @@ int main()
 
                         // สั่งยิงสัญญาณ IR 38kHz ออกขา PD4 ทันทีถ้ามีโค้ด
                         if (code != 0) {
-                            ir_send_code(code);
+                            if (active_protocol == IR_PROTOCOL_SHARP && active_bits == IR_SHARP_BITS) {
+                                ir_send_sharp((uint16_t)code);
+                            } else {
+                                ir_send_code(code);
+                            }
                         }
                     }
 

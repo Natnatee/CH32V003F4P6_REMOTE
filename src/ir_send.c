@@ -55,3 +55,23 @@ void ir_send_code(uint32_t code) {
     ir_carrier_burst(560);
     ir_space(1000);
 }
+
+static void ir_send_sharp_frame(uint16_t raw_code) {
+    for (uint8_t bit = 0; bit < 15; bit++) {
+        ir_carrier_burst(260);
+        ir_space((raw_code & (1U << bit)) ? 1820 : 780);
+    }
+    ir_carrier_burst(260);
+}
+
+// Sharp/Denon: normal -> inverted -> normal, gap 45ms, LSB-first
+void ir_send_sharp(uint16_t raw_code) {
+    uint16_t inverted = raw_code ^ 0x7FE0;
+
+    printf("[IR TX SHARP] raw=0x%04X inverted=0x%04X frames=3\r\n", raw_code, inverted);
+    ir_send_sharp_frame(raw_code);
+    ir_space(45000);
+    ir_send_sharp_frame(inverted);
+    ir_space(45000);
+    ir_send_sharp_frame(raw_code);
+}

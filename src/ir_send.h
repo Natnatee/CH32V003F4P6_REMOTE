@@ -11,3 +11,4 @@ void ir_send_init(void);
 
 // ส่งสัญญาณอินฟราเรด 32-bit (NEC / Samsung Protocol) ความถี่ 38kHz ออกขา PD4
 void ir_send_code(uint32_t code);
+void ir_send_sharp(uint16_t raw_code);

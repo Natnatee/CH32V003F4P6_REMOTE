@@ -10,7 +10,8 @@ void flash_storage_init(void) {
     FLASH->MODEKEYR = FLASH_KEY2;
 }
 
-void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes, char *active_name) {
+void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes, char *active_name,
+                        uint8_t *active_protocol, uint8_t *active_bits) {
     if (profile_idx >= TOTAL_PROFILES_COUNT) return;
 
     uint32_t page_addr = FLASH_PROFILE_BASE_ADDR + (profile_idx * FLASH_PROFILE_PAGE_SIZE);
@@ -23,15 +24,17 @@ void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes, char *activ
                 active_codes[i] = ptr[i];
             }
         } else {
+            // Legacy profile: ล้างรหัสเก่า แต่คงชื่อเดิมไว้ด้านล่าง
             for (int i = 0; i < 12; i++) {
-                active_codes[i] = default_presets[profile_idx][i];
+                active_codes[i] = 0;
             }
         }
     }
 
     // 2. โหลดชื่อโปรไฟล์
     if (active_name) {
-        if (ptr[12] == FLASH_PROFILE_MAGIC && ptr[13] != 0 && ptr[13] != 0xFFFFFFFF) {
+        if ((ptr[12] == FLASH_PROFILE_MAGIC || ptr[12] == FLASH_PROFILE_LEGACY_MAGIC) &&
+            ptr[13] != 0 && ptr[13] != 0xFFFFFFFF) {
             memcpy(active_name, (const char *)&ptr[13], 7);
             active_name[7] = '\0';
         } else {
@@ -39,9 +42,13 @@ void flash_load_profile(uint8_t profile_idx, uint32_t *active_codes, char *activ
             active_name[7] = '\0';
         }
     }
+
+    if (active_protocol) *active_protocol = (ptr[12] == FLASH_PROFILE_MAGIC) ? (uint8_t)ptr[15] : 0;
+    if (active_bits) *active_bits = (ptr[12] == FLASH_PROFILE_MAGIC) ? (uint8_t)(ptr[15] >> 8) : 0;
 }
 
-void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes, const char *active_name) {
+void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes, const char *active_name,
+                        uint8_t active_protocol, uint8_t active_bits) {
     if (profile_idx >= TOTAL_PROFILES_COUNT || !active_codes) return;
 
     uint32_t page_addr = FLASH_PROFILE_BASE_ADDR + (profile_idx * FLASH_PROFILE_PAGE_SIZE);
@@ -86,6 +93,8 @@ void flash_save_profile(uint8_t profile_idx, const uint32_t *active_codes, const
             ptr[i] = name_w0;
         } else if (i == 14) {
             ptr[i] = name_w1;
+        } else if (i == 15) {
+            ptr[i] = (uint32_t)active_protocol | ((uint32_t)active_bits << 8);
         } else {
             ptr[i] = 0;
         }

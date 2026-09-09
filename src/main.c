@@ -62,6 +62,22 @@ static int key_to_index(uint8_t key) {
     }
 }
 
+static void send_profile_button(uint8_t idx, uint8_t repeat) {
+    uint32_t code;
+    uint8_t protocol, bits;
+    flash_decode_ir_button(idx, active_codes[idx], &code, &protocol, &bits);
+    if (code == 0) return;
+
+    if (protocol == IR_PROTOCOL_SHARP) ir_send_sharp((uint16_t)code);
+    else if (protocol == IR_PROTOCOL_NEC) {
+        if (repeat) ir_send_nec_repeat(); else ir_send_nec(code);
+    } else if (protocol == IR_PROTOCOL_SAMSUNG) ir_send_samsung(code);
+    else if (protocol == IR_PROTOCOL_LG) ir_send_lg(code);
+    else if (protocol == IR_PROTOCOL_SONY) ir_send_sony(code, bits);
+    else if (protocol == IR_PROTOCOL_JVC) ir_send_jvc((uint16_t)code);
+    else ir_send_code(code);
+}
+
 // ตารางตัวอักษรสำหรับปุ่ม 1..15 ในโหมด RENAME
 static const char *key_letters[12] = {
     "AB",       // Key 1
@@ -139,6 +155,7 @@ int main()
     oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
 
     uint8_t last_key = 0;
+    uint8_t hold_ticks = 0;
     uint8_t row = 0, col = 0;
     uint32_t blink_tick = 0;
     uint8_t mode_blink_state = 1;
@@ -228,6 +245,7 @@ int main()
         if (key != 0 && key != last_key)
         {
             last_key = key;
+            hold_ticks = 0;
 
             // ==========================================
             // กรณีที่ 1: หน้าแสดงรหัส IR ที่อ่านได้ (โหมด LEARN)
@@ -542,48 +560,27 @@ int main()
                     int idx = key_to_index(key);
                     if (idx >= 0)
                     {
-                        uint32_t code;
-                        uint8_t button_protocol, button_bits;
-                        flash_decode_ir_button((uint8_t)idx, active_codes[idx], &code,
-                                               &button_protocol, &button_bits);
-
-                        // สั่งยิงสัญญาณ IR 38kHz ออกขา PD4 ทันทีถ้ามีโค้ด
-                        if (code != 0) {
-                            if (button_protocol == IR_PROTOCOL_SHARP && button_bits == IR_SHARP_BITS) {
-                                ir_send_sharp((uint16_t)code);
-                            } else if (button_protocol == IR_PROTOCOL_NEC && button_bits == 32) {
-                                ir_send_nec(code);
-                            } else if (button_protocol == IR_PROTOCOL_SAMSUNG && button_bits == 32) {
-                                ir_send_samsung(code);
-                            } else if (button_protocol == IR_PROTOCOL_LG && button_bits == 28) {
-                                ir_send_lg(code);
-                            } else if (button_protocol == IR_PROTOCOL_SONY &&
-                                       (button_bits == 12 || button_bits == 15 || button_bits == 20)) {
-                                ir_send_sony(code, button_bits);
-                            } else if (button_protocol == IR_PROTOCOL_JVC && button_bits == 16) {
-                                ir_send_jvc((uint16_t)code);
-                            } else {
-                                ir_send_code(code);
-                            }
-                        }
+                        send_profile_button((uint8_t)idx, 0);
                     }
 
                     get_footer_str(footer_buf, current_mode, current_profile);
 
-                    // สั่งกระพริบช่องปุ่ม 3 ครั้ง
-                    for (int blink = 0; blink < 3; blink++)
-                    {
-                        oled_render_grid_screen(current_profile_name, footer_buf, key, 1, active_codes);
-                        Delay_Ms(70);
-                        oled_render_grid_screen(current_profile_name, footer_buf, key, 0, active_codes);
-                        Delay_Ms(70);
-                    }
+                    oled_render_grid_screen(current_profile_name, footer_buf, 0, 0, active_codes);
                 }
+            }
+        }
+        else if (key != 0 && current_mode == MODE_SEND && !mode_select_active)
+        {
+            int idx = key_to_index(key);
+            if (idx >= 0 && ++hold_ticks >= 3) {
+                hold_ticks = 0;
+                send_profile_button((uint8_t)idx, 1);
             }
         }
         else if (key == 0)
         {
             last_key = 0;
+            hold_ticks = 0;
         }
 
         // --- 4. การกระพริบ Cursor ในโหมด RENAME และกระพริบ Footer ในหน้า Mode Select ---

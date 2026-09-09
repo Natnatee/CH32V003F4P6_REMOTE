@@ -1,5 +1,15 @@
 #include "ir_send.h"
 
+#ifndef IR_DEBUG_LOG
+#define IR_DEBUG_LOG 0
+#endif
+#if IR_DEBUG_LOG
+#include <stdio.h>
+#define IR_LOG(...) printf(__VA_ARGS__)
+#else
+#define IR_LOG(...) ((void)0)
+#endif
+
 void ir_send_init(void) {
     // 1. เปิด Clock ให้ GPIOD
     RCC->APB2PCENR |= RCC_APB2Periph_GPIOD;
@@ -56,6 +66,7 @@ void ir_send_code(uint32_t code) {
 // NEC standard: leader 9000/4500us, 32 bits LSB-first
 void ir_send_nec(uint32_t code) {
     if (code == 0) return;
+    IR_LOG("TX NEC %08lX\r\n", code);
 
     ir_carrier_burst(9000);
     ir_space(4500);
@@ -67,9 +78,18 @@ void ir_send_nec(uint32_t code) {
     ir_space(40000);
 }
 
+void ir_send_nec_repeat(void) {
+    IR_LOG("TX NEC REPEAT\r\n");
+    ir_carrier_burst(9000);
+    ir_space(2250);
+    ir_carrier_burst(560);
+    ir_space(40000);
+}
+
 // Samsung: leader 4500/4500us, 32 bits LSB-first
 void ir_send_samsung(uint32_t code) {
     if (code == 0) return;
+    IR_LOG("TX SAMSUNG %08lX\r\n", code);
 
     ir_carrier_burst(4500);
     ir_space(4500);
@@ -83,6 +103,7 @@ void ir_send_samsung(uint32_t code) {
 
 void ir_send_lg(uint32_t code) {
     if (code == 0) return;
+    IR_LOG("TX LG %08lX\r\n", code);
     ir_carrier_burst(9000);
     ir_space(4500);
     for (uint8_t bit = 0; bit < 28; bit++) {
@@ -95,6 +116,7 @@ void ir_send_lg(uint32_t code) {
 
 void ir_send_sony(uint32_t code, uint8_t bits) {
     if (code == 0 || (bits != 12 && bits != 15 && bits != 20)) return;
+    IR_LOG("TX SONY %08lX/%u\r\n", code, bits);
     ir_carrier_burst(2400);
     ir_space(600);
     for (uint8_t bit = 0; bit < bits; bit++) {
@@ -105,6 +127,7 @@ void ir_send_sony(uint32_t code, uint8_t bits) {
 }
 
 void ir_send_jvc(uint16_t code) {
+    IR_LOG("TX JVC %04X\r\n", code);
     ir_carrier_burst(8400);
     ir_space(4200);
     for (uint8_t bit = 0; bit < 16; bit++) {
@@ -126,6 +149,7 @@ static void ir_send_sharp_frame(uint16_t raw_code) {
 // Sharp/Denon: normal -> inverted -> normal, gap 45ms, LSB-first
 void ir_send_sharp(uint16_t raw_code) {
     uint16_t inverted = raw_code ^ 0x7FE0;
+    IR_LOG("TX SHARP %04X\r\n", raw_code);
 
     ir_send_sharp_frame(raw_code);
     ir_space(45000);

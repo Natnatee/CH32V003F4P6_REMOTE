@@ -34,7 +34,7 @@ static const uint16_t profile_addresses[TOTAL_PROFILES_COUNT] = {
     0x0000, // 05: SONY
     0xF708, // 06: TCL
     0x807F, // 07: MIBOX
-    0x77E1, // 08: APPLE
+    0x87EE, // 08: APPLE IR (LSB-first)
     0x4004, // 09: PANAS
     0x00FF, // 10: Generic NEC Universal
     0x00FF, // 11
@@ -157,21 +157,8 @@ static const uint32_t default_presets[TOTAL_PROFILES_COUNT][12] = {
         0x807FE01F, // 14: VOL-
         0x807F609F  // 15: VOL+
     },
-    // 08: APPLE TV
-    {
-        0x77E1BA01, // 1: Play/Pause
-        0x77E1D001, // 2: UP
-        0x77E1E001, // 3: Mute
-        0x77E11001, // 5: LEFT
-        0x77E1A001, // 6: SELECT
-        0x77E1E001, // 7: RIGHT
-        0x77E14001, // 9: MENU
-        0x77E1B001, // 10: DOWN
-        0x77E17C01, // 11: HOME
-        0x77E10201, // 13: SOURCE
-        0x77E13001, // 14: VOL-
-        0x77E15001  // 15: VOL+
-    },
+    // 08: APPLE TV defaults are applied in main.c when a button has no saved code
+    {0},
     // 09: PANASONIC TV
     {
         0x40040100, // 1: Power
@@ -199,7 +186,7 @@ static inline uint32_t generate_brute_code(uint8_t profile_idx, uint8_t cmd) {
     }
     if (profile_idx == 7) {
         // APPLE TV
-        return (0x77E10000UL) | ((uint32_t)cmd << 8) | 0x01;
+        return (0x59UL << 24) | ((uint32_t)cmd << 16) | 0x87EEUL;
     }
 
     uint16_t addr = (profile_idx < TOTAL_PROFILES_COUNT) ? profile_addresses[profile_idx] : 0x00FF;

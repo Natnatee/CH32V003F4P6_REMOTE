@@ -63,10 +63,22 @@ static int key_to_index(uint8_t key) {
     }
 }
 
-static void send_profile_button(uint8_t idx, uint8_t repeat) {
+static void send_profile_button(uint8_t profile_idx, uint8_t idx, uint8_t repeat) {
     uint32_t code;
     uint8_t protocol, bits;
-    flash_decode_ir_button(idx, active_codes[idx], &code, &protocol, &bits);
+    uint8_t apple_command = 0;
+    if (profile_idx == 7 && active_codes[idx] == 0) {
+        // Apple aluminum remote: EE 87 command 59 on the wire (NEC LSB-first).
+        static const uint8_t apple_commands[12] = {
+            0x5E, 0x0B, 0, 0x08, 0x5D, 0x07,
+            0x02, 0x0D, 0, 0, 0, 0
+        };
+        apple_command = apple_commands[idx];
+        code = apple_command ? 0x590087EEUL | ((uint32_t)apple_command << 16) : 0;
+        protocol = IR_PROTOCOL_NEC;
+    } else {
+        flash_decode_ir_button(idx, active_codes[idx], &code, &protocol, &bits);
+    }
     if (code == 0) return;
 
     if (protocol == IR_PROTOCOL_SHARP) ir_send_sharp((uint16_t)code);
@@ -76,6 +88,7 @@ static void send_profile_button(uint8_t idx, uint8_t repeat) {
     else if (protocol == IR_PROTOCOL_LG) ir_send_lg(code);
     else if (protocol == IR_PROTOCOL_SONY) ir_send_sony(code, bits);
     else if (protocol == IR_PROTOCOL_JVC) ir_send_jvc((uint16_t)code);
+    if (!repeat && apple_command >= 0x5D) ir_send_nec(0x590487EEUL);
 }
 
 // ตารางตัวอักษรสำหรับปุ่ม 1..15 ในโหมด RENAME
@@ -499,7 +512,7 @@ int main()
                     int idx = key_to_index(key);
                     if (idx >= 0)
                     {
-                        send_profile_button((uint8_t)idx, 0);
+                        send_profile_button(current_profile, (uint8_t)idx, 0);
                     }
 
                     get_footer_str(footer_buf, current_mode, current_profile);
@@ -513,7 +526,7 @@ int main()
             int idx = key_to_index(key);
             if (idx >= 0 && ++hold_ticks >= 3) {
                 hold_ticks = 0;
-                send_profile_button((uint8_t)idx, 1);
+                send_profile_button(current_profile, (uint8_t)idx, 1);
             }
         }
         else if (key == 0)

@@ -238,7 +238,7 @@
 | **05** | **`SONY`** | Sony Bravia TV | Sony SIRC Protocol |
 | **06** | **`TCL`** | TCL / Hisense Android TV | Standard NEC (`0xF708`) |
 | **07** | **`MIBOX`** | Xiaomi Mi Box / TrueID Box | Standard NEC (`0x807F`) |
-| **08** | **`APPLE`** | Apple TV (A1294 / A1156) | Apple NEC (`0x77E1`) |
+| **08** | **`APPLE`** | Apple TV (รหัส IR ทดลอง) | Apple Remote NEC 32-bit, LSB-first (`0x87EE`, ID `0x59`) |
 | **09** | **`PANAS`** | Panasonic Viera TV | Panasonic Protocol |
 | **10..16** | **`10` .. `16`** | ช่องว่างสำหรับผู้ใช้บันทึกเอง | Universal NEC (`0x00FF`) |
 

@@ -108,7 +108,7 @@ pio run -t upload
 - **RAM Optimization:** ถือเฉพาะ Active Profile ปัจจุบันใน RAM (12 ปุ่ม x 4B = 48 ไบต์) ลดการใช้ RAM ลงมหาศาล
 - **ระบบ IR Transmitter (PD4):** ยิงคลื่นพาหะ 38kHz PWM ส่งชุดรหัส 32-bit (NEC / Samsung) ในโหมด SEND ทันทีเมื่อกดปุ่มที่มีรหัส
 - **ระบบ IR Receiver (PD0):** รับสัญญาณและถอดรหัส 32-bit จากรีโมทจริงในโหมด LEARN
-- **APPLE (Profile 08):** ในโหมด SEND ถ้าปุ่มยังไม่มีรหัสที่บันทึก จะส่งรหัส Apple Remote แบบ IR/NEC 32-bit (address `0x87EE`, remote ID `0x59`) สำหรับปุ่ม 1 Play/Pause, 2 Up, 5 Left, 6 Select, 7 Right, 9 Menu/Back, 10 Down; ปุ่มอื่นไม่ยิงรหัส Apple TV และรหัสที่เรียนไว้ยังมีสิทธิ์ก่อน ชุดนี้ยังไม่ได้ทดสอบกับ Apple TV จริง
+- **APPLE (Profile 08):** เตรียมและเขียน raw profile page (`apple_profile_full_page.bin`, 64 bytes) ลง Flash address `0x08003DC0` โดยตรงผ่าน minichlink โดยไม่อัปโหลด firmware; เก็บรหัส NEC 32-bit address `0x87EE`, remote ID `0x59` สำหรับปุ่ม 1 Play/Pause, 2 Up, 5 Left, 6 Select, 7 Right, 9 Back/Menu, 10 Down. ปุ่ม 1/6 ที่บันทึกตรงจะไม่ใช้ fallback extra wake frame. รหัสเป็นชุดทดลอง ยังไม่ได้ยืนยันกับ Apple TV จริง. วิธีสร้าง/เขียนซ้ำอยู่ใน `DOCUMENT.md` หัวข้อ “เขียน Profile ลง Flash โดยตรง”.
 - **ข้อจำกัด Flash:** พื้นที่ firmware ตาม linker (`0x3BC0`) มี 15,296 ไบต์; โค้ด Apple TV ฉบับแรกเกินขอบใน PlatformIO 12 ไบต์ จึงย่อทางเดินส่ง IR แล้ว ต้องตรวจ `pio run` อีกครั้งก่อนอัปโหลด
 - **Tetris High Score Storage (`0x08003BC0`):** ใช้ Flash 1 หน้า (64 ไบต์) แยกจากพื้นที่ 16 Profiles ที่เริ่ม `0x08003C00`; linker จำกัด firmware ไม่ให้ล้ำพื้นที่นี้
 

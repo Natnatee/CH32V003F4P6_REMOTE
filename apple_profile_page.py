@@ -13,12 +13,11 @@ PAGE_ADDRESS = 0x08003DC0
 PAGE_SIZE = 64
 PROFILE_MAGIC = 0xA55A0003
 META_V4_FLAG = 0x80
-OUTPUT = Path(__file__).with_name("apple_profile_page.bin")
+OUTPUT = Path(__file__).with_name("apple_profile_full_page.bin")
 
-# Buttons 1 and 6 must remain empty: the firmware fallback sends an extra
-# 0x590487EE wake-up frame for Play/Pause and Select on a new press.
 # Indices correspond to buttons 1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15.
-COMMANDS = (0, 0x0B, 0, 0x08, 0, 0x07, 0x02, 0x0D, 0, 0, 0, 0)
+# Stored codes for buttons 1 and 6 bypass the firmware's extra wake-up frame.
+COMMANDS = (0x5E, 0x0B, 0, 0x08, 0x5D, 0x07, 0x02, 0x0D, 0, 0, 0, 0)
 
 
 def build_page():

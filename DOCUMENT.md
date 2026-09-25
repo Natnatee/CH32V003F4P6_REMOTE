@@ -13,7 +13,8 @@
    - [โหมด 3: NEW (โหมดล่ารหัส / 256-Command Brute-Force)](#โหมด-3-new-โหมดล่ารหัส--256-command-brute-force)
    - [โหมด 4: RENAME (โหมดแก้ไขชื่อโปรไฟล์)](#โหมด-4-rename-โหมดแก้ไขชื่อโปรไฟล์)
 4. [รายการ 16 Profiles และ Factory Presets 9 แบรนด์](#-4-รายการ-16-profiles-และ-factory-presets-9-แบรนด์)
-5. [ผังพินและการต่อวงจรฮาร์ดแวร์ (Hardware Wiring)](#-5-ผังพินและการต่อวงจรฮาร์ดแวร์-hardware-wiring)
+5. [เขียน Profile ลง Flash โดยตรง](#-5-เขียน-profile-ลง-flash-โดยตรง)
+6. [ผังพินและการต่อวงจรฮาร์ดแวร์ (Hardware Wiring)](#-6-ผังพินและการต่อวงจรฮาร์ดแวร์-hardware-wiring)
 
 ---
 
@@ -244,7 +245,49 @@
 
 ---
 
-## 🔌 5. ผังพินและการต่อวงจรฮาร์ดแวร์ (Hardware Wiring)
+## 🧩 5. เขียน Profile ลง Flash โดยตรง
+
+ใช้เมื่อเตรียมข้อมูล Profile เป็นไฟล์ binary ไว้แล้วและต้องการเขียนเฉพาะหน้า Flash ของ Profile โดยไม่อัปโหลด firmware ใหม่
+
+### Layout ของ Flash
+
+- พื้นที่ Profile เริ่มที่ `0x08003C00`; 16 โปรไฟล์ โปรไฟล์ละ 64 ไบต์
+- Profile 08 มี index 7: `0x08003C00 + (7 × 64) = 0x08003DC0`
+- หน้าหนึ่งมี 16 words แบบ little-endian:
+  - word 0..11: IR code ของปุ่ม `[1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15]`
+  - word 12: magic `0xA55A0003`
+  - word 13..14: ชื่อ Profile 8 bytes (`APPLE\0\0\0`)
+  - word 15: metadata; `0x80` หมายถึง format v4, protocol ค่าเริ่มต้นเป็น NEC, masks เป็นศูนย์
+- เฟิร์มแวร์อ่าน Profile จากหน้านี้ตอนเริ่มทำงานและตอนเปลี่ยน Profile; การเขียนหน้านี้ไม่ต้อง rebuild/upload firmware
+
+### ตัวอย่าง Profile APPLE ที่เตรียมไว้
+
+สคริปต์ `apple_profile_page.py` สร้าง `apple_profile_full_page.bin` ขนาด 64 ไบต์ โดยใช้ NEC 32-bit, Apple address `0x87EE`, remote ID `0x59` และคำสั่ง:
+
+| ปุ่ม | หน้าที่ | Command | Code ที่เก็บ |
+|---|---|---:|---:|
+| 1 | Play/Pause | `0x5E` | `0x595E87EE` |
+| 2 | Up | `0x0B` | `0x590B87EE` |
+| 5 | Left | `0x08` | `0x590887EE` |
+| 6 | Select/OK | `0x5D` | `0x595D87EE` |
+| 7 | Right | `0x07` | `0x590787EE` |
+| 9 | Back/Menu | `0x02` | `0x590287EE` |
+| 10 | Down | `0x0D` | `0x590D87EE` |
+
+ปุ่มอื่นเป็น `0` และแสดงเป็นช่องว่างบน OLED. คำสั่งเป็นชุดทดลองที่ยังไม่ได้ยืนยันกับ Apple TV จริง; ปุ่ม 1 เป็น Play/Pause ไม่ใช่ Power. เมื่อมี code บันทึกตรงใน Profile ปุ่ม 1/6 จะไม่ผ่าน fallback ใน firmware ซึ่งเดิมส่งเฟรมปลุกเพิ่ม
+
+### ขั้นตอนสร้างและเขียนหน้า Profile
+
+รันจาก Git Bash ในโฟลเดอร์โปรเจกต์:
+
+```bash
+python apple_profile_page.py
+/c/Users/natna/.platformio/packages/tool-minichlink/minichlink.exe -w apple_profile_full_page.bin 0x08003DC0
+```
+
+คำสั่ง `-w` เขียนไฟล์ที่ address ระบุโดยตรง; **ไม่ใช่** `pio run -t upload` และไม่เปลี่ยน firmware. การเขียนทับหน้า 64 ไบต์นี้แทน Profile 08 ทั้งหน้า รวมชื่อและ metadata; หยุด `minichlink -T` ก่อนเขียนถ้า monitor เปิดอยู่. ถ้า binary เคยถูกสร้างแล้ว สคริปต์ใช้โหมดป้องกันเขียนทับ (`xb`) จึงลบ/เปลี่ยนชื่อไฟล์เก่าก่อนสร้างชุดใหม่
+
+## 🔌 6. ผังพินและการต่อวงจรฮาร์ดแวร์ (Hardware Wiring)
 
 ```text
                CH32V003F4P6 Dev Board Pin Header Layout
@@ -292,7 +335,7 @@
 
 ---
 
-## 🛠️ 6. คำสั่งคอมไพล์และอัปโหลด (Build & Flash)
+## 🛠️ 7. คำสั่งคอมไพล์และอัปโหลด (Build & Flash)
 
 ```bash
 # 1. คอมไพล์และแฟลชเฟิร์มแวร์ลงบอร์ด

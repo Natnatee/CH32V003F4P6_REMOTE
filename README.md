@@ -3,7 +3,7 @@
 โปรเจกต์ **Smart Remote** บนบอร์ดพัฒนา **CH32V003F4P6** (TSSOP-20) ผ่านเฟรมเวิร์ก `ch32v003fun`:
 - **16 Profiles พร้อม Factory Presets 9 แบรนด์ดัง:**
   - `01: SAMSUNG`, `02: LG`, `03: HIKVI`, `04: SHARP`, `05: SONY`, `06: TCL`, `07: MIBOX`, `08: APPLE`, `09: PANAS`, `10..16: 10..16`
-- `APPLE` (โปรไฟล์ 08) มีรหัส IR ทดลองสำหรับ Play/Pause, ทิศทาง, Select และ Menu/Back ในช่องที่ยังไม่ได้เรียนรู้รหัส; ยังไม่ได้ทดสอบกับ Apple TV จริง ปุ่ม Power/Volume ต้องใช้รหัสของทีวีหรืออุปกรณ์เสียงแยกต่างหาก
+- `APPLE` (โปรไฟล์ 08) มีรหัส IR ทดลองบันทึกใน Flash สำหรับ Play/Pause, ทิศทาง, Select และ Back/Menu; ยังไม่ได้ทดสอบกับ Apple TV จริง ปุ่ม 1 คือ Play/Pause ไม่ใช่ Power; Power/Volume/Input ของทีวีต้องใช้รหัสอุปกรณ์นั้นแยกต่างหาก ดูขั้นตอนสร้างและเขียน Profile page โดยตรงได้ใน `DOCUMENT.md`
 - **ผังปุ่มควบคุม D-Pad สากล (ตาราง 3x4):**
   - `1: ON / Power` | `2: UP (บน)` | `3: OFF / MUTE`
   - `5: LEFT (ซ้าย)` | `6: OK (ตกลง)` | `7: RIGHT (ขวา)`
